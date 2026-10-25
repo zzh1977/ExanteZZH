@@ -67,8 +67,16 @@ DE_WORDS = set("der die das und ist nicht mit von zu den dem ein eine einen für
 # ---------------------------------------------------------------- 配置
 
 def load_config(path):
-    with open(path, encoding="utf-8") as f:
-        cfg = json.load(f)
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            cfg = json.load(f)
+    except FileNotFoundError:
+        sys.exit(f"找不到配置文件：{path}")
+    except UnicodeDecodeError:
+        sys.exit(f"配置文件 {path} 不是 UTF-8 编码。请用记事本打开，另存为时“编码”选 UTF-8。")
+    except json.JSONDecodeError as e:
+        sys.exit(f"配置文件 {path} 格式有误：第 {e.lineno} 行第 {e.colno} 个字符附近（{e.msg}）。\n"
+                 "常见原因：少了逗号、多了逗号、引号用成了中文引号。")
     for key, r in cfg["routes"].items():
         r.setdefault("model", "")
         cats = r.setdefault("categories", {})
@@ -386,6 +394,26 @@ def unique_path(p):
         i += 1
 
 
+def read_csv(path, need=()):
+    """读 CSV。兼容 Excel 另存为“CSV（逗号分隔）”时的 GBK 编码。"""
+    try:
+        raw = Path(path).read_bytes()
+    except FileNotFoundError:
+        sys.exit(f"找不到文件：{path}")
+    for enc in ("utf-8-sig", "gb18030"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    rows = list(csv.DictReader(io.StringIO(text, newline="")))
+    header = rows[0].keys() if rows else ()
+    lacking = [c for c in need if rows and c not in header]
+    if lacking:
+        sys.exit(f"{path} 缺少列：{', '.join(lacking)}。请不要删除或改名表头。")
+    return rows
+
+
 def valid_date(s):
     try:
         dt.date.fromisoformat((s or "").strip())
@@ -407,11 +435,10 @@ def cmd_scan(args, cfg):
     done = set()
     seen_hash = {}
     if out.exists():  # 断点续跑：已处理的文件跳过，查重记录也接上
-        with out.open(encoding="utf-8-sig", newline="") as f:
-            for row in csv.DictReader(f):
-                done.add(row["source"])
-                if row.get("sha256") and not row.get("duplicate_of"):
-                    seen_hash.setdefault(row["sha256"], row["source"])
+        for row in read_csv(out):
+            done.add(row["source"])
+            if row.get("sha256") and not row.get("duplicate_of"):
+                seen_hash.setdefault(row["sha256"], row["source"])
         print(f"发现已有计划表，跳过已处理的 {len(done)} 个文件。")
 
     files = [p for p in iter_files(root, cfg) if str(p) not in done]
@@ -462,8 +489,7 @@ def cmd_scan(args, cfg):
 
 def print_scan_summary(root, out, cfg):
     """计划表行数必须等于目录里的文件数，一个都不能漏。"""
-    with out.open(encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+    rows = read_csv(out)
     in_plan = {r["source"] for r in rows}
     all_files = [str(p) for p in iter_files(root, cfg)]
     missing = [p for p in all_files if p not in in_plan]
@@ -699,8 +725,7 @@ def cmd_apply(args, cfg):
     target = Path(args.target).resolve()
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     undo_path = Path(args.plan).resolve().parent / f"undo_{stamp}.csv"
-    with open(args.plan, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+    rows = read_csv(args.plan, need=("action", "source", "category", "new_name"))
 
     archived, problems, skipped = [], [], 0
     uf = None if args.dry_run else undo_path.open("w", encoding="utf-8-sig", newline="")
@@ -774,8 +799,7 @@ def cmd_verify(args, cfg):
     path = Path(args.index)
     if path.is_dir():  # 传入整理目录时，核对累计总索引
         path = path / INDEX_DIR / "归档总索引.csv"
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+    rows = read_csv(path, need=("归档路径", "SHA256"))
     ok, missing, changed = 0, [], []
     for i, r in enumerate(rows, 1):
         p = Path(r["归档路径"])
@@ -798,8 +822,7 @@ def cmd_verify(args, cfg):
 
 
 def cmd_undo(args, cfg):
-    with open(args.log, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+    rows = read_csv(args.log, need=("new_path", "original_path"))
     ok = kept = 0
     for row in reversed(rows):
         new, orig = Path(row["new_path"]), Path(row["original_path"])

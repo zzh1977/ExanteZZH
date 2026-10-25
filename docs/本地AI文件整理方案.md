@@ -68,11 +68,13 @@
 
 因为目标电脑完全断网，需要先在一台**能上网的 Windows 电脑**上准备好安装包，用 U 盘拷过去。
 
+> 这里是概要。**从下载到使用的逐步说明见 [操作手册.md](操作手册.md)。**
+
 ### 第 1 步：在联网电脑上准备（需下载约 14GB）
 
 1. 下载两个安装程序，放进一个文件夹（如 `E:\offline_ai`）：
    - Ollama：<https://ollama.com/download> → `OllamaSetup.exe`
-   - Python 3.12 64 位：<https://www.python.org/downloads/windows/> → `python-3.12.x-amd64.exe`
+   - Python 3.14 64 位：<https://www.python.org/downloads/windows/> → 进入 3.14 的版本页，选 **Windows installer (64-bit)** → `python-3.14.x-amd64.exe`（不要选 Install Manager，它安装时要联网）
 2. 在这台联网电脑上也安装好 Ollama 和**同一版本**的 Python（勾选 “Add python.exe to PATH”）。
 3. 把本仓库下载到这台电脑，在 PowerShell 中运行：
 
@@ -89,7 +91,7 @@
 
    ```
    OllamaSetup.exe
-   python-3.12.x-amd64.exe
+   python-3.14.x-amd64.exe
    ollama_models\        ← 模型文件
    wheels\               ← Python 依赖包
    file_organizer\       ← 整理工具
@@ -299,4 +301,4 @@ A：① 把 `categories` 改得更贴近你的实际文件；② 加关键词规
 A：工具已用带 BOM 的 UTF-8 保存，一般不会乱码；若仍乱码，用 Excel “数据 → 从文本/CSV” 导入并选 UTF-8。
 
 **Q：pip 离线安装失败？**
-A：联网电脑和断网电脑的 Python 版本（如都是 3.12、64 位）必须一致，因为部分依赖包与版本绑定。
+A：断网电脑上的 Python 版本必须和打包时一致（默认 3.14、64 位），因为部分依赖包与版本绑定。用了别的版本，就在联网电脑上加 `-PyVersion 3.13` 之类的参数重新打包。

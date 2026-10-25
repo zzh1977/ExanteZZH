@@ -2,6 +2,7 @@
 
 ## 本地 AI 文件整理（Windows / 16GB / 完全断网 / 多模型分工）
 
+- **操作手册（从下载到使用）**：[docs/操作手册.md](docs/操作手册.md)
 - 完整方案：[docs/本地AI文件整理方案.md](docs/本地AI文件整理方案.md)
 - 模型选型对比：[docs/本地模型选型对比.md](docs/本地模型选型对比.md)
 - 整理工具：`file_organizer/organize.py`
