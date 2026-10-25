@@ -1,0 +1,39 @@
+{
+  "model": "qwen3:8b",
+  "ollama_url": "http://127.0.0.1:11434",
+  "num_ctx": 4096,
+  "max_chars": 2000,
+  "request_timeout": 600,
+
+  "categories": [
+    "合同协议",
+    "财务票据",
+    "工作报告",
+    "会议纪要",
+    "方案计划",
+    "学习资料",
+    "技术文档",
+    "个人证件",
+    "简历人事",
+    "表格数据",
+    "代码脚本",
+    "照片图片",
+    "音视频",
+    "安装程序",
+    "压缩包",
+    "其他"
+  ],
+
+  "ext_rules": {
+    "照片图片": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".tif", ".tiff", ".raw"],
+    "音视频": [".mp3", ".wav", ".flac", ".aac", ".m4a", ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv"],
+    "安装程序": [".exe", ".msi", ".apk", ".dmg", ".iso"],
+    "压缩包": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"]
+  },
+
+  "skip_dirs": ["$RECYCLE.BIN", "System Volume Information", ".git", "node_modules", "__pycache__", ".venv"],
+  "skip_files": ["desktop.ini", "thumbs.db"],
+
+  "name_template": "{date}_{title}",
+  "max_name_len": 60
+}
