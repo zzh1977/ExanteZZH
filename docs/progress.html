@@ -1,0 +1,257 @@
+<title>AI 助手安全手册</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column, status strip on top, sections as numbered chapters of a field manual */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --fg:#1b2a33; --muted:#5b6b75; --line:#d9e0e4;
+  --accent:#1f5f7a; --accent-soft:#e3eef3; --ok:#2f7a4d; --warn:#a2650f; --warn-soft:#fbf1e1;
+  --code-bg:#eef2f4;
+  --f-display:"Noto Serif SC","Songti SC",serif;
+  --f-body:"Noto Sans SC","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11181d; --surface:#172129; --fg:#dde6eb; --muted:#93a4ae; --line:#2a3842;
+  --accent:#6fb3d0; --accent-soft:#1c2f3a; --ok:#6cc08f; --warn:#e2a654; --warn-soft:#2d2417;
+  --code-bg:#0d1418; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11181d; --surface:#172129; --fg:#dde6eb; --muted:#93a4ae; --line:#2a3842;
+  --accent:#6fb3d0; --accent-soft:#1c2f3a; --ok:#6cc08f; --warn:#e2a654; --warn-soft:#2d2417;
+  --code-bg:#0d1418; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.75}
+.wrap{max-width:820px;margin:0 auto;padding-block:32px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:40px}
+header{display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+h1{font-family:var(--f-display);font-size:clamp(26px,5vw,36px);line-height:1.3;margin:0;text-wrap:balance}
+.lede{color:var(--muted);margin:0;max-width:62ch}
+.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.stat b{font-size:13px;color:var(--muted);font-weight:500}
+.stat span{font-size:14px}
+.pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;font-weight:500;vertical-align:1px}
+.pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+section{display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-family:var(--f-display);font-size:21px;margin:0;display:flex;gap:10px;align-items:baseline;text-wrap:balance}
+h2 .n{font-family:var(--f-mono);font-size:13px;color:var(--accent);font-weight:500}
+h3{font-size:15px;margin:6px 0 0}
+p{margin:0;max-width:66ch}
+ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+.callout{background:var(--warn-soft);border-left:3px solid var(--warn);padding:12px 14px;border-radius:0 6px 6px 0}
+.callout strong{color:var(--warn)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:13px;background:var(--accent-soft)}
+tr:last-child td{border-bottom:0}
+td code,p code,li code{font-family:var(--f-mono);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:4px;word-break:break-all}
+details{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+summary{cursor:pointer;padding:11px 14px;font-weight:500;font-size:14px}
+summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre{margin:0;padding:12px 14px;background:var(--code-bg);font-family:var(--f-mono);font-size:12.5px;line-height:1.6;overflow-x:auto;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
+.chain{font-family:var(--f-mono);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:nowrap}
+.steps{counter-reset:s;list-style:none;padding:0;gap:8px}
+.steps li{counter-increment:s;display:flex;gap:10px}
+.steps li::before{content:counter(s);flex:0 0 22px;height:22px;border-radius:50%;background:var(--accent);color:var(--surface);font-size:12px;display:grid;place-items:center;margin-top:3px}
+.todo{list-style:none;padding:0;gap:8px}
+.todo li{display:flex;gap:10px}
+.todo li::before{content:"";flex:0 0 14px;height:14px;border:1.5px solid var(--muted);border-radius:3px;margin-top:6px}
+.log{border-left:2px solid var(--line);padding-left:14px;display:flex;flex-direction:column;gap:6px}
+.log time{font-family:var(--f-mono);font-size:13px;color:var(--accent)}
+a{color:var(--accent)}
+footer{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:16px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">macOS · Codex 与 Claude Code · 项目进展</div>
+  <h1>让 AI 助手只碰该碰的文件</h1>
+  <p class="lede">目标：只读写指定文件夹、不乱删文件、不乱上网、不自己下载安装软件。本页是仓库 <code>docs/PROGRESS.md</code> 的阅读版，以那份文件为准。</p>
+</header>
+
+<div class="status">
+  <div class="stat"><b>当前阶段</b><span>调研完成 <span class="pill ok">已定</span></span></div>
+  <div class="stat"><b>下一步</b><span>在 Mac 上落地配置并测试 <span class="pill warn">待办</span></span></div>
+  <div class="stat"><b>资料核对</b><span>2026-10-25</span></div>
+</div>
+
+<section>
+  <h2><span class="n">01</span>总体判断</h2>
+  <ul>
+    <li>两家在 Mac 上都用系统自带的 Seatbelt 沙箱，在系统层面限制文件和网络。</li>
+    <li><strong>Codex</strong> 默认更紧，开箱接近要求；但默认能读全盘。</li>
+    <li><strong>Claude Code</strong> 默认沙箱关闭，要自己配；配好后控制更细。</li>
+  </ul>
+  <div class="callout"><strong>共同短板：</strong>在允许的文件夹里能改就能删，沙箱无法单独禁止删除。必须靠逐条审批，再加 git 或 Time Machine 备份兜底。</div>
+  <div class="tbl"><table>
+    <thead><tr><th>要求</th><th>Codex</th><th>Claude Code</th></tr></thead>
+    <tbody>
+      <tr><td>只改指定文件夹</td><td><span class="pill ok">默认</span></td><td><span class="pill warn">需开沙箱</span></td></tr>
+      <tr><td>只读指定文件夹</td><td><span class="pill warn">默认读全盘</span></td><td><span class="pill ok">可挡住</span></td></tr>
+      <tr><td>不乱删</td><td><span class="pill warn">审批 + 规则</span></td><td><span class="pill warn">审批 + deny 规则</span></td></tr>
+      <tr><td>不乱上网</td><td><span class="pill ok">命令断网</span> 搜索需手动关</td><td><span class="pill warn">需手动配置</span></td></tr>
+      <tr><td>不自装软件</td><td><span class="pill ok">断网即可</span></td><td><span class="pill ok">断网 + deny</span></td></tr>
+      <tr><td>防 AI 改设置</td><td><code>/etc/codex/requirements.toml</code></td><td><code>/Library/Application Support/ClaudeCode/managed-settings.json</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>推荐配置</h2>
+  <details>
+    <summary>Codex：~/.codex/config.toml</summary>
+<pre>sandbox_mode    = "workspace-write"  # 只能写启动目录
+approval_policy = "untrusted"        # 除安全只读命令外都要批准
+web_search      = "disabled"         # 关掉联网搜索
+
+[sandbox_workspace_write]
+network_access = false
+writable_roots = []</pre>
+  </details>
+  <details>
+    <summary>Codex：~/.codex/rules/safety.rules（预览功能）</summary>
+<pre>prefix_rule(pattern=["rm"], decision="forbidden", justification="禁止删除，请让用户手动删")
+prefix_rule(pattern=["rmdir"], decision="forbidden")
+prefix_rule(pattern=["curl"], decision="forbidden")
+prefix_rule(pattern=["wget"], decision="forbidden")
+prefix_rule(pattern=["brew"], decision="forbidden")
+prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="forbidden")</pre>
+  </details>
+  <details>
+    <summary>Claude Code：settings.json（最好放进 managed-settings.json）</summary>
+<pre>{
+  "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable",
+    "blockReadsOutsideWorkingDirectories": true,
+    "deny": [
+      "WebFetch", "WebSearch",
+      "Bash(rm *)", "Bash(rmdir *)", "Bash(unlink *)",
+      "Bash(curl *)", "Bash(wget *)", "Bash(brew *)",
+      "Bash(pip install *)", "Bash(pip3 install *)",
+      "Bash(npm install *)", "Bash(npm i *)", "Bash(npx *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": false,
+    "network": { "allowedDomains": [], "strictAllowlist": true }
+  }
+}</pre>
+  </details>
+  <ul>
+    <li>Codex 的规则只管终端命令，它自带的改文件工具仍可能删文件。</li>
+    <li>Claude Code 的 <code>sandbox.enabled</code> 不开，写文件和上网都不受系统限制。</li>
+    <li><code>autoAllowBashIfSandboxed: false</code> 让每条改东西的命令都要你点同意。</li>
+    <li><code>WebFetch</code> 必须禁止，它对部分文档网站默认免询问。</li>
+    <li>deny 规则能被 <code>/bin/rm</code>、<code>bash -c</code> 绕过；可靠的是"沙箱 + 逐条审批"。</li>
+    <li>两边都别随便装 MCP 服务器或插件，它们不在沙箱里。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">03</span>各端在哪跑、能碰什么</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>入口</th><th>代码在哪跑</th><th>能碰的文件</th></tr></thead>
+    <tbody>
+      <tr><td>Codex 网页版</td><td>OpenAI 云端容器</td><td>只有 clone 的 GitHub 仓库</td></tr>
+      <tr><td>Codex iPad</td><td>云任务，或遥控 Mac 上的桌面 app</td><td>云端仓库 / Mac 桌面 app 被授权的范围</td></tr>
+      <tr><td>Codex 桌面 app</td><td>本地沙箱</td><td>打开的项目文件夹</td></tr>
+      <tr><td>claude.ai 聊天</td><td>Anthropic 沙箱容器</td><td>只有上传的文件</td></tr>
+      <tr><td>claude.ai/code</td><td>Anthropic 云端 VM</td><td>只有 clone 的 GitHub 仓库</td></tr>
+      <tr><td>Claude iPad</td><td>云端会话 / Remote Control / Cowork 云端</td><td>云端仓库 / Mac 上该会话的工作目录 / 见第 05 节</td></tr>
+      <tr><td>Claude 桌面 app</td><td>本地或云端</td><td>本地：所选文件夹</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>iPad 本身不运行代码，也读不到 iPad 里的文件（手动上传的除外）。</li>
+    <li>claude.ai 聊天：Settings → Capabilities 可关 "Allow network egress"。</li>
+    <li>claude.ai/code 网络四档：None / Trusted（默认）/ Full / Custom。选 None 也仍能连 Anthropic API。</li>
+    <li>Mac 上的设置文件对云端会话无效；云端要用仓库里的 <code>.claude/settings.json</code> 或环境变量。</li>
+    <li>Remote Control 可用 <code>disableRemoteControl</code> 关掉，或开启 Trusted Devices。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">04</span>Claude Code 设置文件优先级</h2>
+  <div class="chain">managed › --settings › settings.local.json › .claude/settings.json › ~/.claude/settings.json</div>
+  <ul>
+    <li>allow / deny 等列表是合并，不是覆盖。</li>
+    <li>只有 managed 能防 AI 改设置：另外三个文件 Claude Code 自己会写（点"不再询问"就写进 local），managed 要 sudo 才能改。</li>
+    <li>少数安全键在低层级设"更严格"的值也生效，如 <code>blockReadsOutsideWorkingDirectories: true</code>。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">05</span>Cowork 何时能读写 Mac 文件夹</h2>
+  <p>2026-10-06 起 Pro / Max 的新任务都在云端执行。云端任务要碰本地文件夹，必须同时满足：</p>
+  <ol class="steps">
+    <li>任务在 Mac 桌面 app 里发起（或桌面建的定时任务）</li>
+    <li>任务或项目连接了该文件夹</li>
+    <li>运行期间桌面 app 一直开着在线</li>
+  </ol>
+  <ul>
+    <li>读写方式：桌面 app 把单个文件的副本送到云端处理，文件内容会经过 Anthropic 服务器。</li>
+    <li>10/6 前开始的本地任务继续在本地跑完。</li>
+    <li>带本地文件夹的项目只能在桌面 app 里用；其中新建的任务在云端执行，但仍可读写连接的文件夹。</li>
+    <li>iPad / 网页发起的任务永远碰不到本地文件夹。想让文件不出电脑，用 Claude Code 本地会话。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">06</span>云端结果怎么取回</h2>
+  <h3>Claude Code 云端会话</h3>
+  <ul>
+    <li>commit + push、开 PR，本地 <code>git pull</code>（最稳）</li>
+    <li>发布成 Artifact，或让它把文件发进对话</li>
+    <li>会话里的 Files 面板只能看，不能下载</li>
+    <li>VM 回收后，没 push 的东西就没了</li>
+  </ul>
+  <h3>claude.ai 聊天 / Cowork</h3>
+  <p>对话里点 Download；iPad 上用系统预览打开，再"存储到文件"。</p>
+  <h3>Codex 云任务</h3>
+  <p>网页看 diff、Create PR、预览下载生成文件；本地用 <code>codex apply &lt;任务ID&gt;</code>。iPad 目前不能下载生成文件。</p>
+</section>
+
+<section>
+  <h2><span class="n">07</span>云端会话会不会落到本地</h2>
+  <ul>
+    <li>在 Mac 上打开、查看、指挥云端会话：不会本地化，也不碰本地文件。</li>
+    <li>只有这些主动动作会落地：<code>claude --teleport</code>（拉分支并复制会话，之后是独立的本地会话）、Cowork 连接文件夹、<code>codex apply</code>。</li>
+    <li>保守做法：云端任务里弹出"连接文件夹"时不点。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">08</span>待办</h2>
+  <ul class="todo">
+    <li>在 Mac 上写入第 02 节配置；Claude Code 部分放进 managed-settings.json（sudo）</li>
+    <li>逐项测试：让 AI 删文件、访问网站、装包、读项目外文件，确认都被拦住</li>
+    <li>工作文件夹 <code>git init</code>，开启 Time Machine</li>
+    <li>核对 Codex 规则文件夹路径和 <code>untrusted</code> 在当前版本的行为</li>
+    <li>决定是否关闭 Remote Control 或开启 Trusted Devices</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">09</span>更新日志</h2>
+  <div class="log">
+    <time datetime="2026-10-25">2026-10-25</time>
+    <p>建立进展记录，汇总两家安全设置对比、各端文件范围、设置文件优先级、Cowork 规则和云端结果取回方式。</p>
+  </div>
+</section>
+
+<footer>
+  <span>参考：<a href="https://code.claude.com/docs/en/sandboxing">Claude Code 沙箱</a> · <a href="https://code.claude.com/docs/en/permissions">权限</a> · <a href="https://code.claude.com/docs/en/settings">设置优先级</a> · <a href="https://code.claude.com/docs/en/cloud-environments">云端环境</a> · <a href="https://support.claude.com/en/articles/15811196-what-to-expect-with-claude-cowork-in-the-cloud">Cowork 云端</a> · <a href="https://developers.openai.com/codex/agent-approvals-security">Codex 安全</a> · <a href="https://developers.openai.com/codex/config-reference">Codex 配置</a></span>
+  <span>Codex 部分核对自其 GitHub 源码和第三方资料；落地前请再确认一次。</span>
+</footer>
+</div>
