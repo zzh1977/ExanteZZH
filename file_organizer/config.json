@@ -31,6 +31,13 @@
     "压缩包": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"]
   },
 
+  "keyword_rules": {
+    "合同协议": ["合同", "协议"],
+    "财务票据": ["发票", "报销", "收据"],
+    "会议纪要": ["会议纪要", "纪要"],
+    "简历人事": ["简历"]
+  },
+
   "skip_dirs": ["$RECYCLE.BIN", "System Volume Information", ".git", "node_modules", "__pycache__", ".venv"],
   "skip_files": ["desktop.ini", "thumbs.db"],
 

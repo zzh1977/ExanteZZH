@@ -8,12 +8,15 @@
 #   OllamaSetup.exe, python-3.12.x-amd64.exe
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File prepare_offline.ps1 -Out E:\offline_ai
+#         add  -Models qwen3:8b,qwen3.5:9b  to choose models
 
 param(
     [string]$Out = "$PWD\offline_ai",
     [string[]]$Models = @("qwen3:8b", "qwen3:4b")
 )
 $ErrorActionPreference = "Stop"
+# "-File" passes "a,b" as one string, so split it here
+$Models = $Models | ForEach-Object { $_ -split "," } | Where-Object { $_ }
 $repo = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Force $Out | Out-Null
 
