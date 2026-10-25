@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """离线本地文件整理工具（调用本机 Ollama 模型，不联网）。
 
+先分流，再分别处理（每类文件可用不同的模型）：
+  - 照片           -> 看图模型（默认 qwen3-vl:4b）按画面分类
+  - 中文文档       -> 默认只单独分出来，不读内容、不调用模型（可在 config.json 里给它配 Qwen 再细分）
+  - 英文/德文文档  -> 英德文模型（默认 llama3.1:8b）读内容分类
+  - 音视频/安装包/压缩包/代码等 -> 按扩展名直接分，不用模型
+  - 认不出语言的文档 -> 单独放一个文件夹，等人工处理
+分流（判断是否中文、是否照片）由程序按字符和扩展名完成，不用模型，又快又稳定。
+
 模型只负责“给建议”，所有文件操作由本程序按固定规则完成，保证不丢文件：
-  1. scan   : 扫描目录 -> 读取内容 -> 本地模型给出分类/新文件名 -> 写入计划表 plan.csv（不动文件）
+  1. scan   : 扫描 -> 分流 -> 按类别分批调用对应模型 -> 写入计划表 plan.csv（不动文件）
   2. apply  : 人工检查 plan.csv 后执行。每个文件先复制、核对 SHA-256 一致后才删除原文件；
               生成撤销日志、归档清单（CSV）和归档汇总表（Excel），最后对账
   3. verify : 按归档清单重新核对每个归档文件是否存在、内容是否完好
@@ -11,14 +19,16 @@
 用法示例（Windows PowerShell）：
   python organize.py scan   "D:\\待整理" --out plan.csv
   python organize.py apply  plan.csv --target "D:\\已整理"
-  python organize.py verify "D:\\已整理\\_归档索引\\归档清单_20261025_103000.csv"
+  python organize.py verify "D:\\已整理"
   python organize.py undo   undo_20261025_103000.csv
 """
 
 import argparse
+import base64
 import csv
 import datetime as dt
 import hashlib
+import io
 import json
 import os
 import re
@@ -29,18 +39,29 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PLAN_FIELDS = ["action", "source", "category", "new_name", "summary", "tags",
+PLAN_FIELDS = ["action", "source", "language", "category", "new_name", "summary", "tags",
                "confidence", "duplicate_of", "note", "sha256"]
 INDEX_DIR = "_归档索引"
-INDEX_FIELDS = ["类别", "归档路径", "原路径", "摘要", "标签", "大小KB", "SHA256", "归档时间"]
+INDEX_FIELDS = ["类别", "语言", "归档路径", "原路径", "摘要", "标签", "大小KB", "SHA256", "归档时间"]
 REVIEW_NOTE = "建议人工确认"
 UNDO_LOG = re.compile(r"^undo_\d{8}_\d{6}\.csv$")
 TEXT_EXTS = {".txt", ".md", ".csv", ".json", ".log", ".ini", ".xml", ".html",
              ".htm", ".yaml", ".yml", ".py", ".js", ".ts", ".java", ".c", ".cpp",
              ".h", ".cs", ".go", ".sql", ".sh", ".bat", ".ps1", ".css", ".rtf"}
-CODE_EXTS = {".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".cs", ".go",
-             ".sql", ".sh", ".bat", ".ps1"}
 ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]')
+
+LANG_NAMES = {"zh": "中文", "en": "英文", "de": "德文", "latin": "英/德",
+              "unknown": "未知", "photo": "照片", "-": "-"}
+ROUTE_ORDER = ["en_de", "zh", "photo"]  # 分批处理顺序：同一模型的文件集中处理，避免反复切换模型
+
+CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüß]+")
+UMLAUT_RE = re.compile(r"[äöüßÄÖÜ]")
+EN_WORDS = set("the and of to in is that for with on are this be as by from at or you "
+               "your we our it not have has will was were which please dear regards".split())
+DE_WORDS = set("der die das und ist nicht mit von zu den dem ein eine einen für auf sich des "
+               "im auch wir sie bei oder werden wird sind ihr ihre uns zur zum nach über "
+               "sehr geehrte geehrter herr frau mit freundlichen grüßen".split())
 
 
 # ---------------------------------------------------------------- 配置
@@ -48,18 +69,45 @@ ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]')
 def load_config(path):
     with open(path, encoding="utf-8") as f:
         cfg = json.load(f)
-    if "其他" not in cfg["categories"]:
-        cfg["categories"].append("其他")
+    for key, r in cfg["routes"].items():
+        r.setdefault("model", "")
+        cats = r.setdefault("categories", {})
+        if isinstance(cats, list):
+            r["categories"] = cats = {c: "" for c in cats}
+        if cats and key != "photo" and "其他" not in cats:
+            cats["其他"] = ""
     ext_map = {}
     for cat, exts in cfg.get("ext_rules", {}).items():
         for e in exts:
             ext_map[e.lower()] = cat
     cfg["_ext_map"] = ext_map
+    cfg["_photo_exts"] = {e.lower() for e in cfg.get("photo_exts", [])}
     cfg["_kw_rules"] = [(kw.lower(), cat) for cat, kws in cfg.get("keyword_rules", {}).items()
                         for kw in kws]
     cfg["_skip_dirs"] = {d.lower() for d in cfg.get("skip_dirs", [])}
     cfg["_skip_files"] = {f.lower() for f in cfg.get("skip_files", [])}
     return cfg
+
+
+# ---------------------------------------------------------------- 语言判断（不用模型）
+
+def detect_language(stem, text):
+    """按字符统计判断语言：zh / en / de / latin（英德之一，分不清）/ unknown。
+
+    先看内容开头，内容读不到或太少再看文件名。只数字符，不理解内容。
+    """
+    for sample, min_cjk, min_hits in ((text or "", 5, 2), (stem, 1, 1)):
+        cjk = len(CJK_RE.findall(sample))
+        words = [w.lower() for w in WORD_RE.findall(sample)]
+        if cjk >= min_cjk and cjk >= len(words) * 0.5:
+            return "zh"
+        de = sum(w in DE_WORDS for w in words) + len(UMLAUT_RE.findall(sample))
+        en = sum(w in EN_WORDS for w in words)
+        if max(de, en) >= min_hits:
+            return "de" if de > en else "en"
+        if len(words) >= 3:
+            return "latin"
+    return "unknown"  # 读不到内容、文件名也看不出来：不猜，交给人工
 
 
 # ---------------------------------------------------------------- 文本提取
@@ -127,40 +175,18 @@ def extract_text(p, limit):
 
 # ---------------------------------------------------------------- 本地模型
 
-def ask_model(cfg, filename, meta, content):
-    cats = cfg["categories"]
-    schema = {
-        "type": "object",
-        "properties": {
-            "category": {"type": "string", "enum": cats},
-            "title": {"type": "string"},
-            "summary": {"type": "string"},
-            "tags": {"type": "array", "items": {"type": "string"}},
-            "date": {"type": "string"},
-            "confidence": {"type": "string", "enum": ["高", "中", "低"]},
-        },
-        "required": ["category", "title", "summary", "tags", "date", "confidence"],
-    }
-    prompt = (
-        "你是文件整理助手。根据下面的文件信息，完成：\n"
-        f"1. category：从这些类别中选一个最合适的：{'、'.join(cats)}。拿不准就选“其他”。\n"
-        "2. title：给文件起一个简短、准确的中文标题（不超过20字，不要扩展名，不要日期）。\n"
-        "3. summary：一句话概括内容（不超过40字）。\n"
-        "4. tags：1到3个关键词。\n"
-        "5. date：如果内容中能看出文件对应的日期，写成 YYYY-MM-DD，否则留空字符串。\n"
-        "6. confidence：你对类别判断的把握，高/中/低。内容读不到或模棱两可时填“低”。\n"
-        "只输出 JSON。\n\n"
-        f"文件名：{filename}\n{meta}\n"
-        f"文件内容（开头部分）：\n{content if content.strip() else '（无法读取内容，请仅根据文件名判断）'}"
-    )
+def call_ollama(cfg, model, prompt, schema, images=None):
+    msg = {"role": "user", "content": prompt}
+    if images:
+        msg["images"] = images
     body = {
-        "model": cfg["model"],
-        "messages": [{"role": "user", "content": prompt}],
+        "model": model,
+        "messages": [msg],
         "stream": False,
         "format": schema,
         "options": {"temperature": 0, "num_ctx": cfg["num_ctx"]},
     }
-    if "qwen3" in cfg["model"].lower():
+    if "qwen3" in model.lower():
         body["think"] = False  # 关闭思考模式，速度快很多
 
     def post(b):
@@ -177,24 +203,147 @@ def ask_model(cfg, filename, meta, content):
     except urllib.error.HTTPError:
         if "think" not in body:
             raise
-        body.pop("think")  # 旧版 Ollama 不认识 think 参数时重试
+        body.pop("think")  # 模型或旧版 Ollama 不支持 think 参数时重试
         resp = post(body)
-    data = json.loads(resp["message"]["content"])
-    if data.get("category") not in cats:
-        data["category"] = "其他"
-    return data
+    return json.loads(resp["message"]["content"])
 
 
-def check_ollama(cfg):
+def check_models(cfg, models):
     url = cfg["ollama_url"].rstrip("/") + "/api/tags"
     try:
         with urllib.request.urlopen(url, timeout=5) as r:
-            models = [m["name"] for m in json.loads(r.read())["models"]]
+            have = [m["name"] for m in json.loads(r.read())["models"]]
     except Exception:
         sys.exit(f"连不上 Ollama（{cfg['ollama_url']}）。请先启动 Ollama 再运行。")
-    want = cfg["model"] if ":" in cfg["model"] else cfg["model"] + ":latest"
-    if want not in models:
-        sys.exit(f"本机没有模型 {cfg['model']}。已有模型：{', '.join(models) or '无'}")
+    lacking = [m for m in models if (m if ":" in m else m + ":latest") not in have]
+    if lacking:
+        sys.exit(f"本机缺少模型：{', '.join(lacking)}\n已有模型：{', '.join(have) or '无'}\n"
+                 "请导入缺少的模型，或在 config.json 的 routes 里把对应 model 改成已有模型（留空=不用模型）。")
+
+
+def doc_schema(cats, with_lang):
+    props = {
+        "category": {"type": "string", "enum": list(cats)},
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "date": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["高", "中", "低"]},
+    }
+    if with_lang:
+        props["language"] = {"type": "string", "enum": ["en", "de"]}
+    return {"type": "object", "properties": props, "required": list(props)}
+
+
+def ask_zh(cfg, route, filename, meta, content):
+    cats = route["categories"]
+    prompt = (
+        "你是文件整理助手。根据下面的文件信息，完成：\n"
+        f"1. category：从这些类别中选一个最合适的：{'、'.join(cats)}。拿不准就选“其他”。\n"
+        "2. title：给文件起一个简短、准确的中文标题（不超过20字，不要扩展名，不要日期）。\n"
+        "3. summary：一句话概括内容（不超过40字）。\n"
+        "4. tags：1到3个关键词。\n"
+        "5. date：如果内容中能看出文件对应的日期，写成 YYYY-MM-DD，否则留空字符串。\n"
+        "6. confidence：你对类别判断的把握，高/中/低。内容读不到或模棱两可时填“低”。\n"
+        "只输出 JSON。\n\n"
+        f"文件名：{filename}\n{meta}\n"
+        f"文件内容（开头部分）：\n{content if content.strip() else '（无法读取内容，请仅根据文件名判断）'}"
+    )
+    return call_ollama(cfg, route["model"], prompt, doc_schema(cats, False))
+
+
+def ask_en_de(cfg, route, filename, meta, content):
+    cats = route["categories"]
+    cat_lines = "\n".join(f"   - {k}  ({v})" if v else f"   - {k}" for k, v in cats.items())
+    prompt = (
+        "You are a file organizing assistant. The document below is written in English or German.\n"
+        "Return JSON with these fields:\n"
+        "1. category: exactly one folder name from this list (the meaning is in brackets). "
+        "If unsure, choose 其他.\n"
+        f"{cat_lines}\n"
+        "2. language: \"en\" for English, \"de\" for German.\n"
+        "3. title: a short, precise title in the document's own language "
+        "(max 8 words, no date, no file extension).\n"
+        "4. summary: one sentence in Simplified Chinese (简体中文, max 40 characters).\n"
+        "5. tags: 1 to 3 keywords in the document's own language.\n"
+        "6. date: the document's date as YYYY-MM-DD if it is visible in the content, otherwise \"\".\n"
+        "7. confidence: 高 (high), 中 (medium) or 低 (low). Use 低 if the content is missing or ambiguous.\n\n"
+        f"File name: {filename}\n{meta}\n"
+        f"Content (beginning):\n{content if content.strip() else '(content not readable, judge by file name only)'}"
+    )
+    return call_ollama(cfg, route["model"], prompt, doc_schema(cats, True))
+
+
+def ask_photo(cfg, route, image_b64):
+    cats = route["categories"]
+    schema = {
+        "type": "object",
+        "properties": {
+            "category": {"type": "string", "enum": list(cats)},
+            "title": {"type": "string"},
+            "summary": {"type": "string"},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "confidence": {"type": "string", "enum": ["高", "中", "低"]},
+        },
+        "required": ["category", "title", "summary", "tags", "confidence"],
+    }
+    prompt = (
+        "请看这张照片，完成：\n"
+        f"1. category：从这些类别中选一个最合适的：{'、'.join(cats)}。拿不准就选“{list(cats)[-1]}”。\n"
+        "2. title：用中文简短描述画面（不超过12字），用作文件名。\n"
+        "3. summary：一句话描述画面内容（不超过40字）。\n"
+        "4. tags：1到3个关键词。\n"
+        "5. confidence：你对类别判断的把握，高/中/低。\n"
+        "只输出 JSON。"
+    )
+    return call_ollama(cfg, route["model"], prompt, schema, images=[image_b64])
+
+
+# ---------------------------------------------------------------- 照片
+
+def _pil():
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return None, None
+    try:  # 苹果手机的 HEIC 照片（装了 pillow-heif 才支持）
+        from pillow_heif import register_heif_opener
+        register_heif_opener()
+    except ImportError:
+        pass
+    return Image, ImageOps
+
+
+def load_photo(p, max_side):
+    """缩小后转成 JPEG 的 base64（大图直接送模型会很慢、很占内存）。读不了返回 None。"""
+    Image, ImageOps = _pil()
+    if Image is None:
+        if p.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+            return base64.b64encode(p.read_bytes()).decode()
+        return None
+    try:
+        with Image.open(p) as im:
+            im = ImageOps.exif_transpose(im)
+            im.thumbnail((max_side, max_side))
+            buf = io.BytesIO()
+            im.convert("RGB").save(buf, "JPEG", quality=85)
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return None
+
+
+def photo_date(p):
+    """读取照片的拍摄日期（EXIF），读不到返回空串。"""
+    Image, _ = _pil()
+    if Image is None:
+        return ""
+    try:
+        with Image.open(p) as im:
+            exif = im.getexif()
+            v = exif.get_ifd(0x8769).get(36867) or exif.get(306) or ""
+        return valid_date(str(v)[:10].replace(":", "-"))
+    except Exception:
+        return ""
 
 
 # ---------------------------------------------------------------- 工具函数
@@ -253,8 +402,7 @@ def cmd_scan(args, cfg):
         sys.exit(f"目录不存在：{root}")
     out = Path(args.out)
     cfg["_exclude"] = {str(out.resolve())}  # 计划表放在待整理目录里时，不扫描它自己
-    if not args.no_llm:
-        check_ollama(cfg)
+    routes = cfg["routes"]
 
     done = set()
     seen_hash = {}
@@ -267,102 +415,186 @@ def cmd_scan(args, cfg):
         print(f"发现已有计划表，跳过已处理的 {len(done)} 个文件。")
 
     files = [p for p in iter_files(root, cfg) if str(p) not in done]
-    print(f"待处理 {len(files)} 个文件，模型：{'不使用' if args.no_llm else cfg['model']}")
+
+    def model_of(key):
+        return "" if args.no_llm else routes[key].get("model", "")
+
     new_file = not out.exists()
     with out.open("a", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=PLAN_FIELDS)
         if new_file:
             w.writeheader()
-        for i, p in enumerate(files, 1):
-            row = scan_one(p, cfg, seen_hash, args.no_llm)
+
+        def emit(row, prefix=""):
             w.writerow(row)
             f.flush()
             flag = "  ⚠" + REVIEW_NOTE if REVIEW_NOTE in row["note"] else ""
-            print(f"[{i}/{len(files)}] {p.name} -> {row['category']}/{row['new_name']}{flag}")
+            print(f"{prefix}{Path(row['source']).name} -> {row['category']}/{row['new_name']}{flag}")
 
-    # 扫描汇总：计划表行数必须等于目录里的文件数，一个都不能漏
+        # 第 1 步：分流。只看扩展名和字符，不用模型
+        print(f"第 1 步：分流 {len(files)} 个文件（不用模型）...")
+        pending = {k: [] for k in ROUTE_ORDER}
+        for p in files:
+            row, job = route_one(p, cfg, seen_hash)
+            if job is None:
+                emit(row, "  ")
+            elif model_of(job[0]):
+                pending[job[0]].append((p, row, job[1]))
+            else:
+                finish_without_model(p, row, job[0], job[1], cfg)
+                emit(row, "  ")
+
+        # 第 2 步：按类别分批调用各自的模型（同一模型集中处理，16GB 内存一次只装一个模型）
+        needed = sorted({model_of(k) for k in ROUTE_ORDER if pending[k]})
+        if needed:
+            check_models(cfg, needed)
+        for key in ROUTE_ORDER:
+            items = pending[key]
+            if not items:
+                continue
+            print(f"\n第 2 步：{routes[key]['folder']} {len(items)} 个，模型 {model_of(key)}")
+            for i, (p, row, ctx) in enumerate(items, 1):
+                finish_with_model(p, row, key, ctx, cfg)
+                emit(row, f"  [{i}/{len(items)}] ")
+
+    print_scan_summary(root, out, cfg)
+
+
+def print_scan_summary(root, out, cfg):
+    """计划表行数必须等于目录里的文件数，一个都不能漏。"""
     with out.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
-    total_now = sum(1 for _ in iter_files(root, cfg))
     in_plan = {r["source"] for r in rows}
-    missing = [str(p) for p in iter_files(root, cfg) if str(p) not in in_plan]
-    counts = {}
+    all_files = [str(p) for p in iter_files(root, cfg)]
+    missing = [p for p in all_files if p not in in_plan]
+    by_lang, by_cat = {}, {}
     for r in rows:
-        counts[r["category"]] = counts.get(r["category"], 0) + 1
-    print(f"\n===== 扫描汇总 =====\n目录中文件 {total_now} 个，计划表 {len(rows)} 行。")
-    for cat, n in sorted(counts.items(), key=lambda x: -x[1]):
-        print(f"  {cat:<8} {n}")
-    print(f"  需人工确认 {sum(REVIEW_NOTE in r['note'] for r in rows)} 个，"
+        by_lang[r["language"]] = by_lang.get(r["language"], 0) + 1
+        by_cat[r["category"]] = by_cat.get(r["category"], 0) + 1
+    print(f"\n===== 扫描汇总 =====\n目录中文件 {len(all_files)} 个，计划表 {len(rows)} 行。")
+    print("按语言：" + "，".join(f"{k} {v}" for k, v in sorted(by_lang.items(), key=lambda x: -x[1])))
+    for cat, n in sorted(by_cat.items()):
+        print(f"  {cat:<16} {n}")
+    print(f"需人工确认 {sum(REVIEW_NOTE in r['note'] for r in rows)} 个，"
           f"重复文件 {sum(bool(r['duplicate_of']) for r in rows)} 个（默认不动）")
     if missing:
-        print(f"[注意] 有 {len(missing)} 个文件不在计划表中（可能是扫描途中新增的），再运行一次 scan 即可补上。")
+        print(f"[注意] 有 {len(missing)} 个文件不在计划表中（扫描中断或途中新增），再运行一次 scan 即可补上。")
     print(f"\n请用 Excel 打开检查：{out.resolve()}")
-    print("  action 列：move=整理，skip=不动。可直接修改 category / new_name。")
+    print("  action 列：move=整理，skip=不动。category 是目标文件夹（可写多级，如 英文德文文档/合同协议）。")
     print("  建议优先看 note 列标了“建议人工确认”的行。")
 
 
-def match_keyword(name, cfg):
+def match_keyword(name, cfg, cats):
     low = name.lower()
     for kw, cat in cfg["_kw_rules"]:
-        if kw in low:
+        if kw in low and cat in cats:
             return cat
     return ""
 
 
-def scan_one(p, cfg, seen_hash, no_llm):
+def route_one(p, cfg, seen_hash):
+    """分流。返回 (计划行, 任务)。任务为 None 表示这一行已经定好；否则是 (路线, 附加信息)。"""
     row = dict.fromkeys(PLAN_FIELDS, "")
-    row["source"] = str(p)
-    row["action"] = "move"
+    row.update(source=str(p), action="move", language="-")
     ext = p.suffix.lower()
     try:
         st = p.stat()
         digest = file_hash(p)
     except OSError as e:
         row.update(action="skip", category="其他", new_name=p.name, note=f"无法读取，未处理: {e}")
-        return row
+        return row, None
     row["sha256"] = digest
-
     if digest in seen_hash:
         row.update(action="skip", category="重复文件", new_name=p.name,
                    duplicate_of=seen_hash[digest], note="内容与另一文件完全相同，默认不动")
-        return row
+        return row, None
     seen_hash[digest] = str(p)
-
     mdate = dt.date.fromtimestamp(st.st_mtime).isoformat()
-    title, date = p.stem, mdate
-    kw_cat = match_keyword(p.name, cfg)
 
-    if ext in cfg["_ext_map"]:  # 图片/视频/安装包等按扩展名直接分类，不调用模型
-        row.update(category=cfg["_ext_map"][ext], confidence="规则")
-    elif no_llm:
-        cat = kw_cat or ("代码脚本" if ext in CODE_EXTS else "")
-        row.update(category=cat or "其他", confidence="规则" if cat else "低")
+    if ext in cfg["_photo_exts"]:
+        row["language"] = LANG_NAMES["photo"]
+        return row, ("photo", {"mdate": mdate})
+    if ext in cfg["_ext_map"]:  # 音视频、安装包、压缩包、代码等
+        row.update(category=cfg["_ext_map"][ext], new_name=p.name, confidence="规则")
+        return row, None
+
+    if cfg.get("language_detect", "content") == "filename":
+        text = None
+        lang = detect_language(p.stem, "")
+        if lang == "unknown" and WORD_RE.search(p.stem):
+            lang = "latin"
     else:
-        content = extract_text(p, cfg["max_chars"])
-        meta = f"扩展名：{ext or '无'}  大小：{st.st_size // 1024} KB  修改日期：{mdate}"
-        try:
-            ans = ask_model(cfg, p.name, meta, content)
-            row["category"] = ans["category"]
-            row["confidence"] = ans.get("confidence", "")
-            row["summary"] = ans.get("summary", "")
-            row["tags"] = "、".join(ans.get("tags", [])[:3])
-            title = ans.get("title") or p.stem
-            date = valid_date(ans.get("date")) or mdate
-        except Exception as e:
-            row.update(category="其他", confidence="低", note=f"模型调用失败: {type(e).__name__}")
-        if kw_cat and kw_cat != row["category"]:  # 文件名关键词规则优先于模型
-            row["note"] = (row["note"] + f" 模型判为{row['category']}，按关键词规则改为{kw_cat}").strip()
-            row.update(category=kw_cat, confidence="规则")
-        if not content.strip() and row["confidence"] != "规则":
-            row["note"] = (row["note"] + " 未读到内容，仅按文件名判断").strip()
-            row["confidence"] = "低"
+        text = extract_text(p, cfg["max_chars"])
+        lang = detect_language(p.stem, text)
+    row["language"] = LANG_NAMES[lang]
+    if lang == "unknown":
+        row.update(category=cfg["routes"]["unknown"]["folder"], new_name=p.name, confidence="低",
+                   note="读不到文字、文件名也看不出语言（可能是扫描件） " + REVIEW_NOTE)
+        return row, None
+    key = "zh" if lang == "zh" else "en_de"
+    return row, (key, {"text": text, "mdate": mdate, "lang": lang, "size": st.st_size})
 
-    if row["category"] == "其他" or row["confidence"] == "低":
+
+def finish_without_model(p, row, key, ctx, cfg):
+    route = cfg["routes"][key]
+    row.update(new_name=p.name, confidence="规则")
+    if key == "zh":  # 中文：只分出来，不读内容、不改名
+        row["category"] = route["folder"]
+    elif key == "photo":  # 没配看图模型：按拍摄年份分
+        d = photo_date(p) or ctx["mdate"]
+        row["category"] = f"{route['folder']}/{d[:4]}"
+    else:
+        kw = match_keyword(p.name, cfg, route["categories"])
+        row["category"] = f"{route['folder']}/{kw}" if kw else route["folder"]
+        if not kw:
+            row["note"] = "未用模型，只按语言分出"
+
+
+def finish_with_model(p, row, key, ctx, cfg):
+    route = cfg["routes"][key]
+    cats = route["categories"]
+    fallback = "其他" if "其他" in cats else list(cats)[-1]  # 拿不准时归入的类
+    title, date = p.stem, ctx["mdate"]
+    try:
+        if key == "photo":
+            img = load_photo(p, cfg.get("photo_max_side", 1024))
+            if img is None:
+                finish_without_model(p, row, key, ctx, cfg)
+                row.update(confidence="低", note="图片打不开（HEIC 需安装 pillow-heif） " + REVIEW_NOTE)
+                return
+            ans = ask_photo(cfg, route, img)
+            date = photo_date(p) or date
+        else:
+            content = ctx["text"] if ctx["text"] is not None else extract_text(p, cfg["max_chars"])
+            meta = (f"扩展名 / extension: {p.suffix.lower() or '-'}  大小 / size: {ctx['size'] // 1024} KB  "
+                    f"修改日期 / modified: {ctx['mdate']}")
+            ask = ask_zh if key == "zh" else ask_en_de
+            ans = ask(cfg, route, p.name, meta, content)
+            date = valid_date(ans.get("date")) or date
+            if key == "en_de" and ctx["lang"] == "latin" and ans.get("language") in ("en", "de"):
+                row["language"] = LANG_NAMES[ans["language"]]
+            if not content.strip():
+                row["note"] = "未读到内容，仅按文件名判断"
+                ans["confidence"] = "低"
+    except Exception as e:
+        finish_without_model(p, row, key, ctx, cfg)
+        row.update(confidence="低", note=f"模型调用失败({type(e).__name__}) " + REVIEW_NOTE)
+        return
+
+    cat = ans.get("category") if ans.get("category") in cats else fallback
+    row["confidence"] = ans.get("confidence", "")
+    kw = match_keyword(p.name, cfg, cats) if key != "photo" else ""
+    if kw and kw != cat:  # 文件名关键词规则优先于模型
+        row["note"] = (row["note"] + f" 模型判为{cat}，按关键词规则改为{kw}").strip()
+        cat, row["confidence"] = kw, "规则"
+    row["category"] = f"{route['folder']}/{cat}"
+    row["summary"] = ans.get("summary", "")
+    row["tags"] = "、".join(ans.get("tags", [])[:3])
+    title = ans.get("title") or title
+    if cat == fallback or row["confidence"] == "低":
         row["note"] = (row["note"] + " " + REVIEW_NOTE).strip()
-
     stem = cfg["name_template"].format(date=date, title=clean_name(title, cfg["max_name_len"]))
-    row["new_name"] = clean_name(stem, cfg["max_name_len"] + 12) + ext
-    return row
+    row["new_name"] = clean_name(stem, cfg["max_name_len"] + 12) + p.suffix.lower()
 
 
 # ---------------------------------------------------------------- 命令：apply / verify / undo
@@ -417,10 +649,14 @@ def write_index(target, stamp, archived, problems):
             w.writeheader()
         w.writerows(archived)
 
-    summary = {}
-    for r in archived:
-        n, kb = summary.get(r["类别"], (0, 0))
-        summary[r["类别"]] = (n + 1, kb + int(r["大小KB"]))
+    def group(key):
+        out = {}
+        for r in archived:
+            n, kb = out.get(key(r), (0, 0))
+            out[key(r)] = (n + 1, kb + int(r["大小KB"]))
+        return sorted(out.items())
+    by_top = group(lambda r: r["类别"].split("/")[0])
+    by_cat = group(lambda r: r["类别"])
     xlsx = idx_dir / f"归档汇总_{stamp}.xlsx"
     try:
         import openpyxl
@@ -431,10 +667,15 @@ def write_index(target, stamp, archived, problems):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "汇总"
-    ws.append(["类别", "文件数", "总大小(MB)"])
-    for cat, (n, kb) in sorted(summary.items(), key=lambda x: -x[1][0]):
+    ws.append(["大类", "文件数", "总大小(MB)"])
+    for top, (n, kb) in by_top:
+        ws.append([top, n, round(kb / 1024, 2)])
+    ws.append(["合计", len(archived), round(sum(kb for _, (n, kb) in by_top) / 1024, 2)])
+    ws.append([])
+    ws.append(["细分类别", "文件数", "总大小(MB)"])
+    ws.cell(ws.max_row, 1).font = Font(bold=True)
+    for cat, (n, kb) in by_cat:
         ws.append([cat, n, round(kb / 1024, 2)])
-    ws.append(["合计", len(archived), round(sum(kb for _, kb in summary.values()) / 1024, 2)])
     ws2 = wb.create_sheet("明细")
     ws2.append(INDEX_FIELDS)
     for r in archived:
@@ -477,11 +718,13 @@ def cmd_apply(args, cfg):
                 print(f"  [跳过] 源文件不存在：{src}")
                 problems.append([str(src), "源文件不存在（可能已被移走）"])
                 continue
-            cat = clean_name(row["category"], 40)
+            parts = [clean_name(x, 40) for x in re.split(r"[\\/]+", row["category"]) if x.strip()]
+            parts = parts or ["其他"]
+            cat = "/".join(parts)
             name = clean_name(row["new_name"], 120)
             if not Path(name).suffix and src.suffix:
                 name += src.suffix
-            dest = unique_path(target / cat / name)
+            dest = unique_path(target.joinpath(*parts) / name)
             if args.dry_run:
                 print(f"  [预览] {src}  ->  {dest}")
                 archived.append(None)
@@ -496,7 +739,7 @@ def cmd_apply(args, cfg):
             uw.writerow([str(dest), str(src), "copy" if args.copy else "move", digest])
             uf.flush()
             archived.append({
-                "类别": cat, "归档路径": str(dest), "原路径": str(src),
+                "类别": cat, "语言": row.get("language", ""), "归档路径": str(dest), "原路径": str(src),
                 "摘要": row.get("summary", ""), "标签": row.get("tags", ""),
                 "大小KB": size_kb, "SHA256": digest,
                 "归档时间": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -585,15 +828,17 @@ def cmd_undo(args, cfg):
 # ---------------------------------------------------------------- 入口
 
 def main():
-    ap = argparse.ArgumentParser(description="离线本地文件整理（Ollama）")
+    ap = argparse.ArgumentParser(description="离线本地文件整理（Ollama，多模型分流）")
     ap.add_argument("--config", default=str(HERE / "config.json"), help="配置文件路径")
-    ap.add_argument("--model", help="临时指定模型，如 qwen3:4b")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("scan", help="扫描并生成整理计划（不动任何文件）")
+    s = sub.add_parser("scan", help="扫描、分流并生成整理计划（不动任何文件）")
     s.add_argument("folder")
     s.add_argument("--out", default="plan.csv")
-    s.add_argument("--no-llm", action="store_true", help="不用模型，只按扩展名分类+查重")
+    s.add_argument("--no-llm", action="store_true", help="完全不用模型：只分流（中文/英德文/照片/其他）+ 查重")
+    s.add_argument("--zh-model", help="临时指定中文文档模型；none 表示只分出来不细分")
+    s.add_argument("--en-de-model", help="临时指定英文/德文文档模型；none 表示只按语言分出")
+    s.add_argument("--photo-model", help="临时指定照片模型；none 表示只按拍摄年份分")
 
     a = sub.add_parser("apply", help="按计划表整理文件")
     a.add_argument("plan")
@@ -609,8 +854,10 @@ def main():
 
     args = ap.parse_args()
     cfg = load_config(args.config)
-    if args.model:
-        cfg["model"] = args.model
+    for key, opt in (("zh", "zh_model"), ("en_de", "en_de_model"), ("photo", "photo_model")):
+        val = getattr(args, opt, None)
+        if val is not None:  # none / 无 / 空 = 这条线不用模型
+            cfg["routes"][key]["model"] = "" if val.strip().lower() in ("", "none", "无") else val.strip()
     {"scan": cmd_scan, "apply": cmd_apply, "verify": cmd_verify, "undo": cmd_undo}[args.cmd](args, cfg)
 
 

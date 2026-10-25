@@ -8,11 +8,13 @@
 #   OllamaSetup.exe, python-3.12.x-amd64.exe
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File prepare_offline.ps1 -Out E:\offline_ai
-#         add  -Models qwen3:8b,qwen3.5:9b  to choose models
+#         add  -Models llama3.1:8b,qwen3-vl:4b  to choose models
+# Default models: llama3.1:8b (English/German docs), qwen3-vl:4b (photos),
+#                 qwen3:8b (optional: sub-classify Chinese docs)
 
 param(
     [string]$Out = "$PWD\offline_ai",
-    [string[]]$Models = @("qwen3:8b", "qwen3:4b")
+    [string[]]$Models = @("llama3.1:8b", "qwen3-vl:4b", "qwen3:8b")
 )
 $ErrorActionPreference = "Stop"
 # "-File" passes "a,b" as one string, so split it here

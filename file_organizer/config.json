@@ -1,41 +1,67 @@
 {
-  "model": "qwen3:8b",
   "ollama_url": "http://127.0.0.1:11434",
   "num_ctx": 4096,
   "max_chars": 2000,
   "request_timeout": 600,
+  "photo_max_side": 1024,
 
-  "categories": [
-    "合同协议",
-    "财务票据",
-    "工作报告",
-    "会议纪要",
-    "方案计划",
-    "学习资料",
-    "技术文档",
-    "个人证件",
-    "简历人事",
-    "表格数据",
-    "代码脚本",
-    "照片图片",
-    "音视频",
-    "安装程序",
-    "压缩包",
-    "其他"
-  ],
+  "language_detect": "content",
+
+  "routes": {
+    "zh": {
+      "folder": "中文文档",
+      "model": "",
+      "categories": {
+        "合同协议": "", "财务票据": "", "工作报告": "", "会议纪要": "", "方案计划": "",
+        "学习资料": "", "技术文档": "", "个人证件": "", "简历人事": "", "表格数据": "", "其他": ""
+      }
+    },
+    "en_de": {
+      "folder": "英文德文文档",
+      "model": "llama3.1:8b",
+      "categories": {
+        "合同协议": "contracts, agreements / Verträge, Vereinbarungen",
+        "财务票据": "invoices, receipts, bank statements, tax / Rechnungen, Quittungen, Kontoauszüge, Steuer",
+        "工作报告": "reports, analyses / Berichte, Analysen",
+        "会议纪要": "meeting minutes, notes / Protokolle, Besprechungsnotizen",
+        "方案计划": "proposals, plans, offers / Angebote, Konzepte, Pläne",
+        "学习资料": "courses, papers, tutorials / Kurse, Fachartikel, Lernmaterial",
+        "技术文档": "manuals, specifications / Handbücher, Spezifikationen, Datenblätter",
+        "个人证件": "IDs, certificates, official letters / Ausweise, Zeugnisse, Bescheinigungen, Behördenbriefe",
+        "简历人事": "CVs, HR documents / Lebensläufe, Personalunterlagen",
+        "表格数据": "spreadsheets, data lists / Tabellen, Datenlisten",
+        "书信往来": "letters, correspondence / Briefe, Schriftverkehr",
+        "其他": "anything else / Sonstiges"
+      }
+    },
+    "photo": {
+      "folder": "照片",
+      "model": "qwen3-vl:4b",
+      "categories": {
+        "人物合影": "", "风景旅行": "", "美食": "", "宠物动物": "", "证件卡片": "",
+        "票据单据": "", "文档拍照": "", "屏幕截图": "", "物品商品": "", "其他照片": ""
+      }
+    },
+    "unknown": {
+      "folder": "未识别语言"
+    }
+  },
+
+  "photo_exts": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".heif", ".tif", ".tiff"],
 
   "ext_rules": {
-    "照片图片": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".tif", ".tiff", ".raw"],
     "音视频": [".mp3", ".wav", ".flac", ".aac", ".m4a", ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv"],
     "安装程序": [".exe", ".msi", ".apk", ".dmg", ".iso"],
-    "压缩包": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"]
+    "压缩包": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"],
+    "代码脚本": [".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".cs", ".go", ".sql", ".sh", ".bat", ".ps1"],
+    "原始照片": [".raw", ".cr2", ".cr3", ".nef", ".arw", ".dng"]
   },
 
   "keyword_rules": {
-    "合同协议": ["合同", "协议"],
-    "财务票据": ["发票", "报销", "收据"],
-    "会议纪要": ["会议纪要", "纪要"],
-    "简历人事": ["简历"]
+    "合同协议": ["合同", "协议", "contract", "agreement", "vertrag"],
+    "财务票据": ["发票", "报销", "收据", "invoice", "receipt", "rechnung", "quittung"],
+    "会议纪要": ["会议纪要", "纪要", "minutes", "protokoll"],
+    "简历人事": ["简历", "resume", "lebenslauf"]
   },
 
   "skip_dirs": ["$RECYCLE.BIN", "System Volume Information", ".git", "node_modules", "__pycache__", ".venv"],
