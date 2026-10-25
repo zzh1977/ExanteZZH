@@ -228,6 +228,7 @@ prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="f
     <li>在 Mac 上打开、查看、指挥云端会话：不会本地化，也不碰本地文件。</li>
     <li>只有这些主动动作会落地：<code>claude --teleport</code>（拉分支并复制会话，之后是独立的本地会话）、Cowork 连接文件夹、<code>codex apply</code>。</li>
     <li>保守做法：云端任务里弹出"连接文件夹"时不点。</li>
+    <li>在本地电脑打开本页无安全影响：它是浏览器隔离框架里的静态网页，碰不到本地文件、不下载任何东西；唯一外部请求是 Google 字体。</li>
   </ul>
 </section>
 
@@ -245,6 +246,8 @@ prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="f
 <section>
   <h2><span class="n">09</span>更新日志</h2>
   <div class="log">
+    <time datetime="2026-10-25">2026-10-25</time>
+    <p>补充结论：在本地电脑打开 Artifact 无安全影响。</p>
     <time datetime="2026-10-25">2026-10-25</time>
     <p>建立进展记录，汇总两家安全设置对比、各端文件范围、设置文件优先级、Cowork 规则和云端结果取回方式。</p>
   </div>

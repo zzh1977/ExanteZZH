@@ -148,6 +148,7 @@ managed > 命令行 `--settings` > `.claude/settings.local.json` > `.claude/sett
 
 - 正本放仓库 `docs/PROGRESS.md`（本文件）；`CLAUDE.md` 要求每次任务后更新。
 - Artifact 只是从本文件生成的阅读版，以本文件为准。
+- 在本地电脑打开 Artifact 无安全影响：它是浏览器隔离框架里的静态网页，碰不到本地文件、不下载任何东西；唯一外部请求是 Google 字体（Google 可见 IP）。默认私有，分享需在 Share 菜单授权。
 
 ## 待办
 
@@ -159,6 +160,7 @@ managed > 命令行 `--settings` > `.claude/settings.local.json` > `.claude/sett
 
 ## 更新日志
 
+- **2026-10-25**：补充结论：在本地电脑打开 Artifact 无安全影响。
 - **2026-10-25**：建立本文件，汇总 Codex 与 Claude Code 安全设置对比、各端文件范围、设置文件优先级、Cowork 规则、云端结果取回方式；生成 Artifact 阅读版。
 
 ## 相关链接
