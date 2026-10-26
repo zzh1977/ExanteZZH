@@ -17,6 +17,8 @@
 - 两家在 Mac 上都用系统自带的 Seatbelt 沙箱，在系统层面限制文件和网络。
 - **Codex**：默认更紧（只能写当前目录、命令断网），开箱接近要求；但默认能读全盘，细粒度控制较弱。
 - **Claude Code**：默认沙箱关闭，必须自己配；配好后控制更细（限制读取、按域名放行、按命令拒绝、管理员锁定）。
+- **设计逻辑相同，默认值不同**：两家都是"没允许就不让做"。Codex 系统沙箱默认开、审批默认偏松；Claude Code 沙箱默认关、审批默认偏严（改文件和跑命令先问）。
+- **优先级两家一样**：规则冲突时更严的赢（Claude：deny > ask > allow；Codex 命令规则：forbidden > prompt > allow）；路径冲突时更具体的赢（Codex 权限配置同样具体时 deny > write > read）。
 - **共同短板**：在允许的文件夹里能改就能删，沙箱无法单独禁止删除。必须靠逐条审批 + git / Time Machine 备份兜底。
 
 | 要求 | Codex | Claude Code |
@@ -160,6 +162,7 @@ managed > 命令行 `--settings` > `.claude/settings.local.json` > `.claude/sett
 
 ## 更新日志
 
+- **2026-10-26**：补充结论：两家 deny/allow 优先级相同（更严的赢、更具体的赢），差别只在出厂默认值。
 - **2026-10-25**：补充结论：在本地电脑打开 Artifact 无安全影响。
 - **2026-10-25**：建立本文件，汇总 Codex 与 Claude Code 安全设置对比、各端文件范围、设置文件优先级、Cowork 规则、云端结果取回方式；生成 Artifact 阅读版。
 

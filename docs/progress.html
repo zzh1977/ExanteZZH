@@ -88,6 +88,10 @@ footer{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:
     <li><strong>Codex</strong> 默认更紧，开箱接近要求；但默认能读全盘。</li>
     <li><strong>Claude Code</strong> 默认沙箱关闭，要自己配；配好后控制更细。</li>
   </ul>
+  <ul>
+    <li><strong>设计逻辑相同，默认值不同</strong>：两家都是"没允许就不让做"。Codex 系统沙箱默认开、审批默认偏松；Claude Code 沙箱默认关、审批默认偏严。</li>
+    <li><strong>优先级两家一样</strong>：规则冲突时更严的赢（Claude：deny &gt; ask &gt; allow；Codex：forbidden &gt; prompt &gt; allow）；路径冲突时更具体的赢。</li>
+  </ul>
   <div class="callout"><strong>共同短板：</strong>在允许的文件夹里能改就能删，沙箱无法单独禁止删除。必须靠逐条审批，再加 git 或 Time Machine 备份兜底。</div>
   <div class="tbl"><table>
     <thead><tr><th>要求</th><th>Codex</th><th>Claude Code</th></tr></thead>
@@ -246,6 +250,8 @@ prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="f
 <section>
   <h2><span class="n">09</span>更新日志</h2>
   <div class="log">
+    <time datetime="2026-10-26">2026-10-26</time>
+    <p>补充结论：两家 deny/allow 优先级相同，差别只在出厂默认值。</p>
     <time datetime="2026-10-25">2026-10-25</time>
     <p>补充结论：在本地电脑打开 Artifact 无安全影响。</p>
     <time datetime="2026-10-25">2026-10-25</time>
