@@ -3,7 +3,8 @@
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File install_offline.ps1 -Dest D:\AI
 #
-# Safe to run again: an existing config.json in the destination is kept.
+# Safe to run again: an existing config.json in the destination is kept,
+# and the Python environment ($Dest\venv) is rebuilt from the bundled packages.
 
 param(
     [string]$Dest = "D:\AI",
@@ -32,6 +33,8 @@ if ($keep) {
     Write-Host "      kept your existing config.json"
 }
 if (Test-Path "$pkg\docs") { Copy-Item -Recurse -Force "$pkg\docs" "$Dest\" }
+# Keep the package files on this PC so the Python environment can be rebuilt without the USB drive
+Copy-Item -Recurse -Force "$pkg\wheels" "$Dest\"
 
 Write-Host "[3/4] Setting Ollama environment variables ..."
 # Per-user environment variables (take effect after Ollama restarts)
@@ -41,10 +44,11 @@ setx OLLAMA_NUM_PARALLEL "1" | Out-Null           # save RAM on 16 GB
 setx OLLAMA_MAX_LOADED_MODELS "1" | Out-Null      # only one model in memory at a time
 setx OLLAMA_KEEP_ALIVE "10m" | Out-Null
 
-Write-Host "[4/4] Installing Python packages offline ..."
-python -m pip install --no-index --find-links "$pkg\wheels" -r "$pkg\file_organizer\requirements.txt"
+Write-Host "[4/4] Creating the organizer's own Python environment in $Dest\venv ..."
+# All packages go into $Dest\venv; the system Python stays clean
+& "$Dest\file_organizer\setup_venv.bat"
 if ($LASTEXITCODE -ne 0) {
-    throw "pip install failed. The Python version must match the one used to build the package (default 3.14)."
+    throw "Python environment setup failed. The Python version must match the one used to build the package (default 3.14)."
 }
 
 if ($BlockFirewall) {
@@ -59,4 +63,4 @@ Write-Host "Done. Next steps:"
 Write-Host "  1. Right-click the Ollama tray icon -> Quit Ollama, then start Ollama again from the Start menu."
 Write-Host "  2. Open a NEW PowerShell window and run:  ollama list"
 Write-Host "  3. cd $Dest\file_organizer"
-Write-Host "     python organize.py scan `"D:\ToSort`" --out $Dest\plan.csv"
+Write-Host "     .\organize.bat scan `"D:\ToSort`" --out $Dest\plan.csv"

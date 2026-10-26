@@ -110,7 +110,7 @@
    powershell -ExecutionPolicy Bypass -File install_offline.ps1 -Dest D:\AI
    ```
 
-   脚本会：把模型复制到 `D:\AI\ollama_models`、设置 Ollama 的环境变量（只监听本机、一次只装一个模型）、离线安装 Python 依赖。
+   脚本会：把模型复制到 `D:\AI\ollama_models`、设置 Ollama 的环境变量（只监听本机、一次只装一个模型）、创建工具专用的 Python 环境 `D:\AI\venv` 并离线安装依赖（系统 Python 不装任何包）。
    想额外用防火墙禁止 Ollama 联网：以管理员身份运行，并加参数 `-BlockFirewall`。
 
 4. 右下角托盘图标里**退出 Ollama，再重新打开**（让环境变量生效）。
@@ -127,8 +127,7 @@ ollama run llama3.1:8b "Fasse in einem Satz zusammen: Das ist ein Test."
 ### 手动安装方式（不想用脚本时）
 
 - 模型：把联网电脑 `C:\Users\用户名\.ollama\models` 整个文件夹，复制到断网电脑同样位置即可。
-- 依赖：联网电脑运行 `pip download -r requirements.txt -d wheels`，断网电脑运行
-  `pip install --no-index --find-links wheels -r requirements.txt`。
+- 依赖：联网电脑运行 `pip download -r requirements.txt -d wheels`，把 `wheels` 文件夹放到断网电脑 `D:\AI\wheels`，再运行 `D:\AI\file_organizer\setup_venv.bat`，它会建好 `D:\AI\venv` 并离线安装依赖。
 - 也可以在 ModelScope / HuggingFace 下载 `.gguf` 模型文件，断网电脑上用 Modelfile 导入：
   ```
   # Modelfile 内容
@@ -142,13 +141,13 @@ ollama run llama3.1:8b "Fasse in einem Satz zusammen: Das ist ein Test."
 
 ## 四、使用整理工具
 
-工具位置：`D:\AI\file_organizer\organize.py`。**扫描阶段不会动任何文件**。
+工具位置：`D:\AI\file_organizer\`，用 `.\organize.bat` 运行（它会自动使用工具专用的 Python 环境 `D:\AI\venv`）。**扫描阶段不会动任何文件**。
 
 ### 1. 扫描，生成整理计划
 
 ```powershell
 cd D:\AI\file_organizer
-python organize.py scan "D:\待整理" --out plan.csv
+.\organize.bat scan "D:\待整理" --out plan.csv
 ```
 
 屏幕上会看到两步：先“分流”（很快），再“英文德文文档 N 个，模型 llama3.1:8b”、“照片 N 个，模型 qwen3-vl:4b”逐个处理。
@@ -182,9 +181,9 @@ python organize.py scan "D:\待整理" --out plan.csv
 ### 3. 先预览，再执行
 
 ```powershell
-python organize.py apply plan.csv --target "D:\已整理" --dry-run   # 只打印，不动文件
-python organize.py apply plan.csv --target "D:\已整理"             # 移动文件
-python organize.py apply plan.csv --target "D:\已整理" --copy      # 复制（原文件保留，最保险）
+.\organize.bat apply plan.csv --target "D:\已整理" --dry-run   # 只打印，不动文件
+.\organize.bat apply plan.csv --target "D:\已整理"             # 移动文件
+.\organize.bat apply plan.csv --target "D:\已整理" --copy      # 复制（原文件保留，最保险）
 ```
 
 整理结果：
@@ -214,7 +213,7 @@ D:\已整理\
 ### 4. 核对归档是否完好
 
 ```powershell
-python organize.py verify "D:\已整理"     # 按累计总索引重新核对每个文件的指纹
+.\organize.bat verify "D:\已整理"     # 按累计总索引重新核对每个文件的指纹
 ```
 
 会列出“不存在”或“内容已变”的文件。建议整理完、拷贝到移动硬盘后各核对一次。
@@ -224,7 +223,7 @@ python organize.py verify "D:\已整理"     # 按累计总索引重新核对每
 执行后会生成 `undo_日期_时间.csv`：
 
 ```powershell
-python organize.py undo undo_20261025_103000.csv
+.\organize.bat undo undo_20261025_103000.csv
 ```
 
 ### 6. 自定义（config.json）

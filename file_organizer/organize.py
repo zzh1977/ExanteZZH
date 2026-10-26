@@ -17,10 +17,10 @@
   4. undo   : 根据撤销日志把文件放回原处
 
 用法示例（Windows PowerShell）：
-  python organize.py scan   "D:\\待整理" --out plan.csv
-  python organize.py apply  plan.csv --target "D:\\已整理"
-  python organize.py verify "D:\\已整理"
-  python organize.py undo   undo_20261025_103000.csv
+  .\\organize.bat scan   "D:\\待整理" --out plan.csv
+  .\\organize.bat apply  plan.csv --target "D:\\已整理"
+  .\\organize.bat verify "D:\\已整理"
+  .\\organize.bat undo   undo_20261025_103000.csv
 """
 
 import argparse
@@ -791,8 +791,8 @@ def cmd_apply(args, cfg):
     if xlsx:
         print(f"归档汇总表：{xlsx}")
     print(f"撤销日志：{undo_path}")
-    print(f"核对归档：python organize.py verify \"{run_csv}\"")
-    print(f"如需还原：python organize.py undo \"{undo_path}\"")
+    print(f"核对归档：.\\organize.bat verify \"{run_csv}\"")
+    print(f"如需还原：.\\organize.bat undo \"{undo_path}\"")
 
 
 def cmd_verify(args, cfg):
