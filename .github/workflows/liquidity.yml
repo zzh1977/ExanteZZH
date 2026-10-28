@@ -5,11 +5,15 @@ name: liquidity-step1
 on:
   push:
     branches: [claude/liquidity-step1]
-    paths: ["liquidity/**", "tests/**", "requirements.txt", ".github/workflows/liquidity.yml"]
+    paths: ["liquidity/**", "!liquidity/text/**", "tests/**", "requirements.txt", ".github/workflows/liquidity.yml"]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: liquidity-branch-writes
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -34,4 +38,5 @@ jobs:
           git add -f data/raw output || true
           git diff --cached --quiet && exit 0
           git commit -m "Update FRED data and liquidity outputs [skip ci]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push

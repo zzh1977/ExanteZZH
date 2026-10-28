@@ -7,6 +7,8 @@ import argparse
 import os
 from pathlib import Path
 
+import pandas as pd
+
 from . import fred, indicators, validate
 from .config import SERIES
 
@@ -18,11 +20,18 @@ def main(argv=None):
     p.add_argument("--cache", default="data/raw")
     p.add_argument("--refresh", action="store_true", help="re-download instead of using the cache")
     p.add_argument("--api-key", default=os.environ.get("FRED_API_KEY"))
+    p.add_argument("--text", default="data/text/weekly_tone.csv",
+                   help="weekly hawk/dove tone from liquidity.text (skipped if missing)")
     args = p.parse_args(argv)
 
     raw = fred.fetch_all(SERIES, api_key=args.api_key, cache_dir=Path(args.cache), refresh=args.refresh)
     weekly = indicators.prepare(raw)
-    idx = indicators.build(weekly).loc[args.start:]
+    text = None
+    if Path(args.text).exists():
+        tt = pd.read_csv(args.text, index_col=0, parse_dates=True)
+        text = tt["text_tone"]
+        print(f"text tone: {tt['source'].iloc[-1]}, {text.notna().sum()} weeks")
+    idx = indicators.build(weekly, text).loc[args.start:]
     idx = idx.dropna(how="all", subset=indicators.SUB_INDICES)
 
     out = Path(args.out)

@@ -77,3 +77,12 @@ def test_reserve_management_bill_buying_is_not_counted_as_easing():
     rmp = indicators.build(indicators.prepare(synthetic_raw(rmp_bills_per_week_mn=10_000)))
     after = base.index >= pd.Timestamp("2026-03-01")
     np.testing.assert_allclose(rmp.loc[after, "policy_13w_gdp"], base.loc[after, "policy_13w_gdp"])
+
+
+def test_text_tone_joins_expectations():
+    w = indicators.prepare(synthetic_raw())
+    rng = np.random.default_rng(3)
+    tone = pd.Series(rng.normal(size=len(w)), index=w.index)
+    out = indicators.build(w, tone)
+    both = out[["z_expected_easing", "z_text"]].dropna()
+    np.testing.assert_allclose(out.loc[both.index, "expectations"], both.mean(axis=1))

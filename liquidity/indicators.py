@@ -35,7 +35,8 @@ def prepare(raw: dict[str, pd.Series]) -> pd.DataFrame:
     return w
 
 
-def build(w: pd.DataFrame) -> pd.DataFrame:
+def build(w: pd.DataFrame, text_tone: pd.Series | None = None) -> pd.DataFrame:
+    """text_tone: weekly hawk/dove tone (positive = dovish), from liquidity.text."""
     gdp = w["GDP"]
     out = pd.DataFrame(index=w.index)
 
@@ -78,7 +79,12 @@ def build(w: pd.DataFrame) -> pd.DataFrame:
     out["z_facility"] = -transform.expanding_z(np.log1p(out["facility_gdp"] / 0.1))
 
     out["stock"] = out[["z_reserves", "z_policy"]].mean(axis=1)
-    out["expectations"] = out["z_expected_easing"]
+    exp_cols = ["z_expected_easing"]
+    if text_tone is not None:
+        out["text_tone"] = text_tone.reindex(out.index).ffill(limit=2)
+        out["z_text"] = transform.expanding_z(out["text_tone"])
+        exp_cols.append("z_text")
+    out["expectations"] = out[exp_cols].mean(axis=1)
     out["stress"] = out[["z_sofr_iorb", "z_facility"]].mean(axis=1)
 
     subs = out[["stock", "expectations", "stress"]]
