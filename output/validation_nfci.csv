@@ -1,5 +1,5 @@
 series,weeks,corr_same_week,corr_next_4w_change,corr_next_13w_change
 stock,983,-0.019,0.221,0.261
-expectations,983,0.114,-0.034,-0.03
+expectations,983,-0.006,0.042,0.059
 stress,983,0.659,-0.095,-0.126
-composite,983,0.549,0.059,0.063
+composite,983,0.503,0.083,0.091
