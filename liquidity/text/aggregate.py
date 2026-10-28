@@ -11,6 +11,7 @@ from .. import config
 
 HALF_LIFE_DAYS = 14
 STALE_DAYS = 120
+SPEECH_SHRINK = 10  # a speech with n policy sentences counts n / (n + 10) of its weight
 
 
 def weekly_tone(docs: pd.DataFrame, tone_col: str, start=None, end=None,
@@ -21,6 +22,10 @@ def weekly_tone(docs: pd.DataFrame, tone_col: str, start=None, end=None,
     rel = pd.to_datetime(d["release_date"]).to_numpy("datetime64[D]")
     tone = d[tone_col].to_numpy(float)
     weight = d["weight"].to_numpy(float)
+    if "n_relevant" in d and "kind" in d:
+        n = d["n_relevant"].to_numpy(float)
+        is_speech = (d["kind"] == "speech").to_numpy()
+        weight = weight * (is_speech * (n / (n + SPEECH_SHRINK)) + ~is_speech)
     start = pd.Timestamp(start) if start else pd.Timestamp(rel.min())
     end = pd.Timestamp(end) if end else pd.Timestamp(rel.max()) + pd.Timedelta(days=7)
     fridays = pd.date_range(start, end, freq=config.WEEK)

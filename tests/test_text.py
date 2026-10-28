@@ -87,3 +87,11 @@ def test_weekly_tone_decays_and_has_no_lookahead():
     assert w.loc["2026-01-16"] == 1.0
     # two weeks older = half the weight: (0.5 * 1 + 1 * -1) / 1.5
     assert w.loc["2026-01-23"] == pytest.approx(-1 / 3)
+
+
+def test_short_speeches_count_less():
+    docs = pd.DataFrame({"release_date": ["2026-01-07", "2026-01-07"], "dict_tone": [1.0, -1.0],
+                         "weight": [1.0, 1.0], "kind": ["speech", "speech"], "n_relevant": [2, 50]})
+    w = aggregate.weekly_tone(docs, "dict_tone", start="2026-01-09", end="2026-01-09")
+    expected = (2 / 12 - 50 / 60) / (2 / 12 + 50 / 60)
+    assert w.iloc[0] == pytest.approx(expected)
