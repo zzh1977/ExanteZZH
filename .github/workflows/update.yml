@@ -1,0 +1,59 @@
+name: 更新美联储监测数据
+
+on:
+  schedule:
+    # 美东收盘后（UTC 22:30，周一至周五）+ 早上补一次（UTC 13:30，赶上 8:30 的数据发布）
+    - cron: "30 22 * * 1-5"
+    - cron: "30 13 * * 1-5"
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ["fedmon/**", "tests/**", ".github/workflows/update.yml", "requirements.txt"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fedmon-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -q tests
+      - name: 抓取数据并生成看板
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python -m fedmon update
+      - name: 运行状态
+        if: always()
+        run: |
+          cat data/status.json || true
+          python -c "import json;d=json.load(open('data/implied.json'));print('隐含利率来源:',d.get('source'));print('失败:',d.get('errors'));print('会议数:',len(d.get('meetings',[])))" || true
+          python -c "import pandas as pd;d=pd.read_csv('data/dotplot.csv');print('点阵图期数:',d.sep_date.nunique(),d.sep_date.min(),'~',d.sep_date.max())" || true
+      - name: 上传调试文件（原始页面 + 看板）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fedmon-output
+          path: |
+            data/
+            docs/index.html
+          retention-days: 7
+      - name: 提交数据（仅 main）
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898499+github-actions[bot]@users.noreply.github.com"
+          git add data docs
+          git diff --cached --quiet || git commit -m "数据更新 $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push

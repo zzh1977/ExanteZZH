@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美联储监测看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --neutral: #898781; --up: #006300; --down: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --up: #0ca30c; --down: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19;
+  --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --up: #0ca30c; --down: #e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 18px; margin: 32px 0 4px; }
+.sub { color: var(--ink2); font-size: 13px; }
+.note { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+nav { position: sticky; top: 0; z-index: 5; background: var(--page); padding: 10px 0;
+  display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+nav a { color: var(--ink2); text-decoration: none; font-size: 13px; padding: 4px 10px;
+  border-radius: 999px; border: 1px solid var(--border); }
+nav a:hover { color: var(--ink); }
+.ranges { display: flex; gap: 6px; margin-left: auto; }
+.ranges button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink2); cursor: pointer; }
+.ranges button[aria-pressed="true"] { color: var(--ink); font-weight: 600; border-color: var(--axis); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.tile .k { color: var(--ink2); font-size: 12px; }
+.tile .v { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.tile .d { color: var(--muted); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 12px 4px; margin-top: 12px; min-width: 0; }
+.card h3 { font-size: 14px; margin: 0; }
+.chart { width: 100%; height: 320px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--ink2); font-weight: 600; }
+.scroll { overflow-x: auto; }
+.badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--ink2); }
+.warn { color: var(--down); }
+@media (max-width: 420px) { .grid2 { grid-template-columns: 1fr; } .chart { height: 280px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>美联储监测看板</h1>
+  <span class="sub" id="gen"></span>
+</header>
+<nav>
+  <a href="#overview">概览</a><a href="#dots">点阵图</a><a href="#implied">隐含利率</a>
+  <a href="#inflation">通胀</a><a href="#labor">就业</a><a href="#fx">美元</a>
+  <div class="ranges" role="group" aria-label="时间范围">
+    <button data-y="1">1年</button><button data-y="3" aria-pressed="true">3年</button>
+    <button data-y="5">5年</button><button data-y="0">全部</button>
+  </div>
+</nav>
+
+<section id="overview"><div class="tiles" id="tiles"></div></section>
+
+<section id="dots">
+  <h2>点阵图</h2>
+  <div class="sub" id="dots-sub"></div>
+  <div class="grid2">
+    <div class="card"><h3>最新一期点阵 vs 市场定价（年末利率）</h3><div class="chart" id="c-dots"></div></div>
+    <div class="card"><h3>历次 SEP 中位数变化</h3><div class="chart" id="c-dothist"></div></div>
+  </div>
+</section>
+
+<section id="implied">
+  <h2>市场隐含利率</h2>
+  <div class="sub" id="imp-sub"></div>
+  <div class="grid2">
+    <div class="card"><h3>逐次会议隐含利率路径</h3><div class="chart" id="c-path"></div></div>
+    <div class="card"><h3>各次会议目标区间概率</h3><div class="scroll" id="t-probs"></div></div>
+  </div>
+  <div class="card"><h3>短端美债 vs EFFR（粗略代理）</h3><div class="scroll" id="t-bills"></div></div>
+</section>
+
+<section id="inflation">
+  <h2>通胀</h2>
+  <div class="grid2">
+    <div class="card"><h3>CPI / PCE 同比（%）</h3><div class="chart ts" id="c-cpi"></div></div>
+    <div class="card"><h3>PPI 同比（%）</h3><div class="chart ts" id="c-ppi"></div></div>
+    <div class="card"><h3>盈亏平衡通胀（%）</h3><div class="chart ts" id="c-be"></div></div>
+  </div>
+</section>
+
+<section id="labor">
+  <h2>就业</h2>
+  <div class="grid2">
+    <div class="card"><h3>失业率（%）</h3><div class="chart ts" id="c-ur"></div></div>
+    <div class="card"><h3>非农新增（千人）</h3><div class="chart ts" id="c-nfp"></div></div>
+    <div class="card"><h3>初请失业金（人）</h3><div class="chart ts" id="c-icsa"></div></div>
+    <div class="card"><h3>萨姆规则指标（≥0.5 为衰退信号）</h3><div class="chart ts" id="c-sahm"></div></div>
+  </div>
+</section>
+
+<section id="fx">
+  <h2>美元</h2>
+  <div class="grid2">
+    <div class="card"><h3>美元指数 DXY</h3><div class="chart ts" id="c-dxy"></div></div>
+    <div class="card"><h3>政策利率与 2 年期美债（%）</h3><div class="chart ts" id="c-rates"></div></div>
+  </div>
+  <p class="note">数据来源：FRED（圣路易斯联储）、美联储 SEP、CME FedWatch / 联邦基金期货、雅虎财经。仅供研究参考。</p>
+</section>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const S = D.series;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, nd = 2) => v == null ? "—" : Number(v).toFixed(nd);
+let years = 3;
+
+document.getElementById("gen").textContent = "更新于 " + D.generated;
+
+// ---------- 概览 ----------
+function tiles() {
+  const K = D.kpi, el = document.getElementById("tiles");
+  const nextMeet = D.calendar.find(m => m.end >= D.today);
+  const im = (D.implied.meetings || [])[0];
+  const items = [
+    ["目标区间", K.DFEDTARL && K.DFEDTARU ? `${fmt(K.DFEDTARL.v)}–${fmt(K.DFEDTARU.v)}%` : "—", K.DFEDTARU && K.DFEDTARU.d],
+    ["EFFR", K.EFFR ? fmt(K.EFFR.v) + "%" : "—", K.EFFR && K.EFFR.d],
+    ["下次 FOMC", nextMeet ? nextMeet.end + (nextMeet.sep ? " ★SEP" : "") : "—",
+      im ? `${im.date} 预期 ${im.chg_bp_this_meeting ?? im.chg_bp_vs_now}bp` : "无隐含利率数据"],
+    ["核心 PCE 同比", K.PCEPILFE ? fmt(K.PCEPILFE.v) + "%" : "—", K.PCEPILFE && K.PCEPILFE.d.slice(0, 7)],
+    ["核心 CPI 同比", K.CPILFESL ? fmt(K.CPILFESL.v) + "%" : "—", K.CPILFESL && K.CPILFESL.d.slice(0, 7)],
+    ["失业率", K.UNRATE ? fmt(K.UNRATE.v, 1) + "%" : "—", K.UNRATE && K.UNRATE.d.slice(0, 7)],
+    ["5y5y 通胀预期", K.T5YIFR ? fmt(K.T5YIFR.v) + "%" : "—", K.T5YIFR && K.T5YIFR.d],
+    ["DXY", K.DXY_ICE ? fmt(K.DXY_ICE.v) : (K.DXY_CALC ? fmt(K.DXY_CALC.v) + "（自算）" : "—"),
+      (K.DXY_ICE || K.DXY_CALC || {}).d],
+  ];
+  el.innerHTML = items.map(([k, v, d]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d || ""}</div></div>`).join("");
+}
+
+// ---------- 通用 ----------
+function layout(extra = {}) {
+  const ink2 = css("--ink2"), grid = css("--grid"), axis = css("--axis");
+  return Object.assign({
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: "system-ui, -apple-system, 'PingFang SC', sans-serif", size: 12, color: ink2 },
+    margin: { l: 44, r: 12, t: 16, b: 36 },
+    xaxis: { gridcolor: grid, linecolor: axis, zeroline: false },
+    yaxis: { gridcolor: grid, linecolor: axis, zeroline: false, ticksuffix: "" },
+    legend: { orientation: "h", y: -0.18, x: 0 },
+    hovermode: "x unified", hoverlabel: { bgcolor: css("--surface"), font: { color: css("--ink") } },
+  }, extra);
+}
+const CFG = { displayModeBar: false, responsive: true };
+function line(id, name, color, extra = {}) {
+  const s = S[id];
+  if (!s) return null;
+  return Object.assign({ x: s.x, y: s.y, name: name || s.name, type: "scatter", mode: "lines",
+    line: { color, width: 2 } }, extra);
+}
+function startDate() {
+  if (!years) return null;
+  const d = new Date(); d.setFullYear(d.getFullYear() - years);
+  return d.toISOString().slice(0, 10);
+}
+function tsPlot(el, traces, extra = {}) {
+  traces = traces.filter(Boolean);
+  if (!traces.length) { document.getElementById(el).innerHTML = '<p class="note">暂无数据</p>'; return; }
+  const lay = layout(extra);
+  const s = startDate();
+  lay.xaxis = Object.assign({}, lay.xaxis, { range: s ? [s, D.today] : null, autorange: !s });
+  lay.yaxis = Object.assign({}, lay.yaxis, { autorange: true });
+  // y 轴按可见区间自适应
+  if (s) {
+    let lo = Infinity, hi = -Infinity;
+    traces.forEach(t => t.x.forEach((x, i) => { if (x >= s && t.y[i] != null) { lo = Math.min(lo, t.y[i]); hi = Math.max(hi, t.y[i]); } }));
+    if (extra.yref != null) { lo = Math.min(lo, extra.yref); hi = Math.max(hi, extra.yref); }
+    if (isFinite(lo)) { const pad = (hi - lo) * 0.08 || 0.5; lay.yaxis.range = [lo - pad, hi + pad]; lay.yaxis.autorange = false; }
+  }
+  Plotly.react(el, traces, lay, CFG);
+}
+function refLine(y, label) {
+  return { type: "line", xref: "paper", x0: 0, x1: 1, y0: y, y1: y, line: { color: css("--muted"), width: 1 },
+    label: label ? { text: label, textposition: "start", font: { size: 11, color: css("--muted") } } : undefined };
+}
+
+// ---------- 点阵图 ----------
+function marketYearEnd() {
+  // 每年最后一次会议后的市场隐含利率
+  const out = {};
+  (D.implied.meetings || []).forEach(m => { out[m.date.slice(0, 4)] = m.exp_rate; });
+  return out;
+}
+function dots() {
+  const L = D.dots.latest, sub = document.getElementById("dots-sub");
+  if (!L) {
+    sub.innerHTML = '<span class="warn">历史点阵尚未解析成功</span>' +
+      (D.dots.fred_median ? "，下图为 FRED 最新中位数" : "");
+    const fm = D.dots.fred_median || [];
+    Plotly.react("c-dots", [{ x: fm.map(r => r.horizon), y: fm.map(r => r.median), type: "scatter",
+      mode: "markers", marker: { size: 10, color: css("--s1") }, name: "中位数" }], layout(), CFG);
+    return;
+  }
+  sub.textContent = `最新 SEP：${L.sep_date}。圆点大小 = 委员人数；菱形 = 当前市场定价。`;
+  const order = h => h === "Longer run" ? 9999 : +h;
+  const hs = [...new Set(L.dots.map(d => d.horizon))].sort((a, b) => order(a) - order(b));
+  const lab = h => h === "Longer run" ? "长期" : h;
+  const mk = marketYearEnd();
+  const traces = [
+    { x: L.dots.map(d => lab(d.horizon)), y: L.dots.map(d => d.rate), type: "scatter", mode: "markers",
+      name: "委员点位", marker: { color: css("--s1"), opacity: 0.55, size: L.dots.map(d => 6 + d.count * 2.2),
+        line: { color: css("--surface"), width: 2 } },
+      customdata: L.dots.map(d => d.count), hovertemplate: "%{x}：%{y:.3f}% · %{customdata} 人<extra></extra>" },
+    { x: L.median.sort((a, b) => order(a.horizon) - order(b.horizon)).map(r => lab(r.horizon)),
+      y: L.median.map(r => r.median), type: "scatter", mode: "lines+markers", name: "中位数",
+      line: { color: css("--ink2"), width: 2 }, marker: { size: 8 },
+      hovertemplate: "中位数 %{y:.3f}%<extra></extra>" },
+  ];
+  const mx = hs.filter(h => mk[h] != null);
+  if (mx.length) traces.push({ x: mx.map(lab), y: mx.map(h => mk[h]), type: "scatter", mode: "markers",
+    name: "市场定价", marker: { symbol: "diamond", size: 12, color: css("--s2"), line: { color: css("--surface"), width: 2 } },
+    hovertemplate: "市场 %{y:.3f}%<extra></extra>" });
+  Plotly.react("c-dots", traces, layout({ hovermode: "closest", xaxis: { type: "category", categoryorder: "array",
+    categoryarray: hs.map(lab), gridcolor: css("--grid"), linecolor: css("--axis") } }), CFG);
+}
+function dotHist() {
+  const H = D.dots.history;
+  if (!H.length) { document.getElementById("c-dothist").innerHTML = '<p class="note">暂无历史点阵数据</p>'; return; }
+  // 展示：今年末、明年末、后年末、长期 —— 每条线是“对某一年末的预测”随 SEP 的变化
+  const y0 = new Date().getFullYear();
+  const pick = [[String(y0), "--s1"], [String(y0 + 1), "--s2"], [String(y0 + 2), "--s3"], ["Longer run", "--s4"]];
+  const traces = pick.map(([h, c]) => {
+    const r = H.filter(x => x.horizon === h);
+    return r.length ? { x: r.map(x => x.sep_date), y: r.map(x => x.median), type: "scatter", mode: "lines+markers",
+      name: h === "Longer run" ? "长期" : h + " 年末", line: { color: css(c), width: 2 }, marker: { size: 8 } } : null;
+  }).filter(Boolean);
+  const pol = line("TARGET_MID", "实际政策利率（中点）", css("--neutral"), { line: { color: css("--neutral"), width: 1.5, shape: "hv" } });
+  if (pol) traces.push(pol);
+  tsPlot("c-dothist", traces, { hovermode: "closest" });
+}
+
+// ---------- 隐含利率 ----------
+function impliedView() {
+  const I = D.implied, M = I.meetings || [], sub = document.getElementById("imp-sub");
+  const errs = Object.entries(I.errors || {}).map(([k, v]) => `${k}：${v}`).join("；");
+  sub.innerHTML = `来源：<span class="badge">${I.source || "无"}</span> · ${I.asof || ""}` +
+    (errs ? `<div class="note">未成功的来源：${errs}</div>` : "");
+  if (M.length) {
+    const traces = [{ x: M.map(m => m.date), y: M.map(m => m.exp_rate), type: "scatter", mode: "lines+markers",
+      name: "今天", line: { color: css("--s1"), width: 2, shape: "hv" }, marker: { size: 8 } }];
+    // 与 1 周前、1 个月前的定价对比
+    const H = D.implied_history || [];
+    const days = [...new Set(H.map(h => h.asof))].sort();
+    [[7, "1周前", "--s2"], [30, "1个月前", "--s3"]].forEach(([n, label, c]) => {
+      const t = new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+      const d = days.filter(x => x <= t).pop();
+      if (!d) return;
+      const r = H.filter(h => h.asof === d);
+      traces.push({ x: r.map(h => h.meeting), y: r.map(h => h.exp_rate), type: "scatter", mode: "lines+markers",
+        name: `${label}（${d}）`, line: { color: css(c), width: 2, shape: "hv" }, marker: { size: 8 } });
+    });
+    Plotly.react("c-path", traces, layout({ hovermode: "x unified",
+      shapes: I.effr_now ? [refLine(I.effr_now, "当前 EFFR")] : [] }), CFG);
+    // 概率表
+    const ranges = [...new Set(M.flatMap(m => Object.keys(m.probs || {})))]
+      .sort((a, b) => parseFloat(a) - parseFloat(b));
+    document.getElementById("t-probs").innerHTML = `<table><tr><th>会议</th><th>预期利率</th>` +
+      ranges.map(r => `<th>${r}</th>`).join("") + `</tr>` + M.map(m => `<tr><td>${m.date}</td><td>${fmt(m.exp_rate, 3)}</td>` +
+      ranges.map(r => { const p = (m.probs || {})[r]; return `<td>${p ? (p * 100).toFixed(1) + "%" : ""}</td>`; }).join("") +
+      `</tr>`).join("") + `</table>`;
+  } else {
+    document.getElementById("c-path").innerHTML = '<p class="note">今天没有拿到逐次会议的隐含利率，见下方短端美债代理。</p>';
+    document.getElementById("t-probs").innerHTML = '<p class="note">暂无</p>';
+  }
+  const B = I.bill_proxy || [];
+  document.getElementById("t-bills").innerHTML = B.length ? `<table><tr><th>期限</th><th>收益率</th><th>减 EFFR</th></tr>` +
+    B.map(b => `<tr><td>${b.horizon}</td><td>${fmt(b.yield)}%</td><td>${b.spread_bp_vs_effr}bp</td></tr>`).join("") +
+    `</table><p class="note">负值大致代表市场预期这段时间内会降息；含期限溢价和国库券供需影响，只作方向参考。</p>` : '<p class="note">暂无</p>';
+}
+
+// ---------- 时间序列 ----------
+function timeSeries() {
+  tsPlot("c-cpi", [line("CPIAUCSL", "CPI", css("--s1")), line("CPILFESL", "核心 CPI", css("--s2")),
+    line("PCEPILFE", "核心 PCE", css("--s3")), line("PCEPI", "PCE", css("--s4"))], { shapes: [refLine(2, "2% 目标")], yref: 2 });
+  tsPlot("c-ppi", [line("PPIFIS", "PPI 最终需求", css("--s1")), line("WPSFD4131", "核心 PPI", css("--s2"))], { shapes: [refLine(0)] });
+  tsPlot("c-be", [line("T5YIE", "5年", css("--s1")), line("T10YIE", "10年", css("--s2")), line("T5YIFR", "5y5y", css("--s3"))],
+    { shapes: [refLine(2, "2%")] });
+  tsPlot("c-ur", [line("UNRATE", "U-3", css("--s1")), line("U6RATE", "U-6", css("--s2"))]);
+  const nfp = S.PAYEMS && { x: S.PAYEMS.x, y: S.PAYEMS.y, type: "bar", name: "非农新增", marker: { color: css("--s1") } };
+  tsPlot("c-nfp", [nfp], { hovermode: "x", bargap: 0.15, shapes: [refLine(0)] });
+  tsPlot("c-icsa", [line("ICSA", "初请", css("--s1"))], { hovermode: "x", margin: { l: 52, r: 12, t: 16, b: 36 } });
+  Plotly.relayout("c-icsa", { "yaxis.tickformat": "~s" });
+  tsPlot("c-sahm", [line("SAHMREALTIME", "萨姆规则", css("--s1"))], { hovermode: "x", shapes: [refLine(0.5, "0.5")] });
+  tsPlot("c-dxy", [line("DXY_ICE", "DXY（ICE）", css("--s1")), line("DXY_CALC", "DXY（自算）", css("--s2"))]);
+  tsPlot("c-rates", [line("TARGET_MID", "目标区间中点", css("--s1"), { line: { color: css("--s1"), width: 2, shape: "hv" } }),
+    line("EFFR", "EFFR", css("--s3")), line("DGS2", "2年期美债", css("--s2"))]);
+}
+
+function render() { tiles(); dots(); dotHist(); impliedView(); timeSeries(); }
+document.querySelectorAll(".ranges button").forEach(b => b.addEventListener("click", () => {
+  years = +b.dataset.y;
+  document.querySelectorAll(".ranges button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  timeSeries(); dotHist();
+}));
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+if (window.Plotly) render(); else document.querySelector(".wrap").insertAdjacentHTML("beforeend",
+  '<p class="warn">图表库加载失败，请检查网络。</p>');
+</script>
+</body>
+</html>
