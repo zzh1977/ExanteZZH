@@ -36,7 +36,10 @@ def update() -> pd.DataFrame:
     except Exception as e:
         log.warning("雅虎 DXY 失败: %s，只用自算值", e)
         ice = pd.Series(dtype=float, name="dxy_ice")
-    df = pd.concat([ice, calc], axis=1).sort_index()
+    if ice.empty and calc.empty:
+        raise ValueError("DXY 两个来源都没有数据")
+    df = pd.concat([s for s in (ice, calc) if not s.empty], axis=1).sort_index()
+    df.index = pd.to_datetime(df.index)
     df = df[df.index >= "2007-01-01"]
     df.index.name = "date"
     DATA.mkdir(exist_ok=True)

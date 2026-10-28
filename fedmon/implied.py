@@ -205,7 +205,12 @@ def from_fedwatch() -> dict:
                             break
                     except Exception:
                         pass
-                htmls += [fr.content() for fr in pg.frames]
+                for fr in pg.frames:
+                    c = fr.content()
+                    htmls.append(c)
+                    txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c))
+                    log.info("FedWatch 诊断 frame=%s len=%d tables=%d 文本: %s", fr.url[:120], len(c),
+                             c.lower().count("<table"), txt[:300])
                 rows = []
                 for h in htmls:
                     rows = parse_fedwatch_matrix(h)
