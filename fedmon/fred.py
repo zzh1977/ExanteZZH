@@ -57,14 +57,20 @@ def update_all() -> dict:
     """下载全部序列。返回 {id: 'ok'|错误信息}。单个失败不影响其他。"""
     FRED_DIR.mkdir(parents=True, exist_ok=True)
     status = {}
+    streak = 0  # 连续失败次数：一个站点整体不通时不要每个序列都等超时
     for sid in FRED_SERIES:
+        if streak >= 4:
+            status[sid] = "跳过（前面连续失败）"
+            continue
         try:
             s = fetch(sid)
             s.to_frame("value").to_csv(FRED_DIR / f"{sid}.csv")
             status[sid] = "ok"
+            streak = 0
             log.info("FRED %s: %d 条, 最新 %s", sid, len(s), s.index[-1].date())
         except Exception as e:
             status[sid] = f"失败: {e}"
+            streak += 1
             log.error("FRED %s 失败: %s", sid, e)
     return status
 

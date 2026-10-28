@@ -17,7 +17,7 @@ def session() -> requests.Session:
     return _session
 
 
-def get(url: str, *, params=None, timeout=60, retries=3, **kw) -> requests.Response:
+def get(url: str, *, params=None, timeout=(10, 30), retries=2, **kw) -> requests.Response:
     last = None
     for i in range(retries):
         try:
@@ -29,5 +29,6 @@ def get(url: str, *, params=None, timeout=60, retries=3, **kw) -> requests.Respo
                 break
         except requests.RequestException as e:  # 网络错误才重试
             last = e
-        time.sleep(2 ** (i + 1))
+        if i < retries - 1:
+            time.sleep(2 * (i + 1))
     raise last

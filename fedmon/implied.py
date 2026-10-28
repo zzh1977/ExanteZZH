@@ -114,10 +114,15 @@ def from_zq() -> dict:
     meetings = [d for d in fomc_calendar.upcoming(today)["end"]][:10]
     prices = {}
     y, m = today.year, today.month
+    misses = 0
     for _ in range(16):
+        if misses >= 3:
+            break
         try:
             prices[(y, m)] = yahoo.last_price(zq_symbol(y, m))
+            misses = 0
         except Exception as e:
+            misses += 1
             log.info("ZQ %s 无报价: %s", zq_symbol(y, m), e)
         y, m = _add_month(y, m)
     if len(prices) < 4:
@@ -188,7 +193,7 @@ def from_fedwatch() -> dict:
                                     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
         for url in FEDWATCH_URLS:
             try:
-                pg.goto(url, timeout=60000, wait_until="domcontentloaded")
+                pg.goto(url, timeout=30000, wait_until="domcontentloaded")
                 pg.wait_for_timeout(8000)
                 # 切到“Probabilities”矩阵视图（按钮文字可能变化，尽量宽松匹配）
                 for fr in [pg.main_frame, *pg.frames]:

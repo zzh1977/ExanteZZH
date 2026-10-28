@@ -30,12 +30,15 @@ def discover_sep_dates() -> list[str]:
     except Exception as e:
         log.warning("日程页读取失败: %s", e)
     covered = {int(d[:4]) for d in found}
+    fails = 0
     for y in range(FIRST_YEAR, date.today().year):
-        if y in covered:
+        if y in covered or fails >= 3:
             continue
         try:
             found |= set(SEP_RE.findall(http.get(BASE + f"fomchistorical{y}.htm").text))
+            fails = 0
         except Exception as e:
+            fails += 1
             log.info("%d 历史页无网页版 SEP 或读取失败: %s", y, e)
     return sorted(found)
 

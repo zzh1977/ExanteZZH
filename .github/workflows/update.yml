@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: fedmon-update
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   update:
@@ -31,7 +31,9 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest -q tests
       - name: 抓取数据并生成看板
+        timeout-minutes: 15
         env:
+          PYTHONUNBUFFERED: "1"
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -m fedmon update
       - name: 运行状态
