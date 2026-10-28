@@ -1,15 +1,15 @@
 Latest week: 2026-10-30
-stock           0.66
+stock           0.24
 expectations   -0.70
-stress         -0.30
-composite      -0.12
+stress         -0.64
+composite      -0.37
 
 Versus -NFCI (positive = moves with looser conditions):
               weeks  corr_same_week  corr_next_4w_change  corr_next_13w_change
 series                                                                        
-stock           983          -0.237                0.225                 0.349
+stock           983          -0.019                0.221                 0.261
 expectations    983           0.114               -0.034                -0.030
-stress          983           0.640                0.090                 0.063
-composite       983           0.329                0.200                 0.264
+stress          983           0.659               -0.095                -0.126
+composite       983           0.549                0.059                 0.063
 
 Written to /home/runner/work/ExanteZZH/ExanteZZH/output
