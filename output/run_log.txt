@@ -1,16 +1,16 @@
 text tone: tone_dict, 981 weeks
 Latest week: 2026-10-30
 stock           0.24
-expectations   -1.16
+expectations   -1.39
 stress         -0.72
-composite      -0.54
+composite      -0.62
 
 Versus -NFCI (positive = moves with looser conditions):
               weeks  corr_same_week  corr_next_4w_change  corr_next_13w_change
 series                                                                        
 stock           983          -0.019                0.221                 0.261
-expectations    983          -0.006                0.042                 0.059
+expectations    983          -0.004                0.040                 0.056
 stress          983           0.659               -0.095                -0.126
-composite       983           0.503                0.083                 0.091
+composite       983           0.499                0.081                 0.089
 
 Written to /home/runner/work/ExanteZZH/ExanteZZH/output
