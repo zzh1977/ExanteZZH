@@ -24,6 +24,11 @@ def main():
     print("=== FRED ===")
     probe("https://api.stlouisfed.org/fred/series/observations?series_id=UNRATE&file_type=json")
     probe("https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE")
+    try:
+        r = requests.get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE", timeout=(10, 60))
+        print(f"[{r.status_code}] fredgraph（普通请求头） len={len(r.text)}")
+    except Exception as e:
+        print(f"[ERR] fredgraph（普通请求头）: {e}")
     probe("https://fred.stlouisfed.org/")
     print("=== 美联储历史页 ===")
     for y in (2015, 2019):

@@ -8,6 +8,7 @@ import logging
 import os
 
 import pandas as pd
+import requests
 
 from . import http
 from .config import DATA, FRED_SERIES, START_DATE
@@ -27,9 +28,13 @@ def _via_api(sid: str, key: str) -> pd.Series:
     return _clean(df.rename(columns={"value": sid}), sid)
 
 
+_plain = requests.Session()  # 不伪装浏览器：FRED 会拦截伪造浏览器标识的请求
+
+
 def _via_graph(sid: str) -> pd.Series:
-    r = http.get("https://fred.stlouisfed.org/graph/fredgraph.csv",
-                 params={"id": sid, "cosd": START_DATE})
+    r = _plain.get("https://fred.stlouisfed.org/graph/fredgraph.csv",
+                   params={"id": sid, "cosd": START_DATE}, timeout=(10, 60))
+    r.raise_for_status()
     df = pd.read_csv(io.StringIO(r.text))
     return _clean(df, sid)
 
