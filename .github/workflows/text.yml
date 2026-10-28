@@ -6,7 +6,7 @@ name: liquidity-text
 on:
   push:
     branches: [claude/liquidity-step1]
-    paths: ["liquidity/text/**", "requirements-text.txt", ".github/workflows/text.yml"]
+    paths: ["liquidity/text/**", "requirements-text.txt", ".github/workflows/text.yml", ".github/scripts/**"]
   workflow_dispatch:
     inputs:
       rescore:
@@ -45,6 +45,9 @@ jobs:
       - name: Fetch and score Fed texts
         env:
           PYTHONUNBUFFERED: "1"
+          # FOMC-RoBERTa is a gated model: a HuggingFace read token from an
+          # account that accepted its terms. Without it, dictionary only.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python -m liquidity.text --start 2008 --scorers dict,model ${{ inputs.rescore && '--rescore' || '' }}
       - name: Rebuild index with text tone
@@ -53,11 +56,4 @@ jobs:
           python -m liquidity --out output 2>&1 | tee output/run_log.txt
       - name: Commit scores and outputs
         if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f data/text/*.csv output || true
-          git diff --cached --quiet && exit 0
-          git commit -m "Update hawk/dove text scores [skip ci]"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push
+        run: .github/scripts/commit_outputs.sh "Update hawk/dove text scores [skip ci]" data/text/doc_scores.csv data/text/weekly_tone.csv data/text/fetch_report.csv data/text/latest_sentences.csv output
