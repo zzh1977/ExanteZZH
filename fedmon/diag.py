@@ -37,7 +37,8 @@ def main():
     print("=== 其他候选源 ===")
     probe("https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1.json")
     probe("https://api.bls.gov/publicAPI/v1/timeseries/data/LNS14000000")
-    probe("https://stooq.com/q/l/?s=dx.f&f=sd2t2ohlcv&h&e=csv")
+    probe("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve&field_tdr_date_value=2026&page&_format=csv")
+    probe("https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?lastNObservations=1&format=csvdata")
 
 
 if __name__ == "__main__":

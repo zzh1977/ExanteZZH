@@ -189,7 +189,7 @@ def from_fedwatch() -> dict:
     htmls = []
     with sync_playwright() as pw:
         br = pw.chromium.launch()
-        pg = br.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        pg = br.new_page(extra_http_headers={"Referer": "https://www.cmegroup.com/"}, user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                                     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
         for url in FEDWATCH_URLS:
             try:

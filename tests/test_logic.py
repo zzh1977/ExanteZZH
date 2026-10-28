@@ -82,3 +82,14 @@ def test_fedwatch_matrix():
     <tr><td>12/9/2026</td><td>62.5%</td><td>37.5%</td></tr></table>"""
     rows = implied.parse_fedwatch_matrix(html)
     assert rows == [{"date": "2026-12-09", "probs": {"3.50-3.75": 0.625, "3.75-4.00": 0.375}}]
+
+
+def test_parse_bls():
+    from fedmon import altsources
+    js = {"Results": {"series": [{"seriesID": "LNS14000000", "data": [
+        {"year": "2026", "period": "M09", "value": "4.4"},
+        {"year": "2026", "period": "M08", "value": "4.3"},
+        {"year": "2025", "period": "M13", "value": "4.2"}]}]}}
+    s = altsources.parse_bls(js)["LNS14000000"]
+    assert list(s.values) == [4.3, 4.4]
+    assert s.index[-1] == pd.Timestamp(2026, 9, 1)

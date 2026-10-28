@@ -30,16 +30,28 @@ def discover_sep_dates() -> list[str]:
     except Exception as e:
         log.warning("日程页读取失败: %s", e)
     covered = {int(d[:4]) for d in found}
+    candidates = set()
     fails = 0
     for y in range(FIRST_YEAR, date.today().year):
         if y in covered or fails >= 3:
             continue
         try:
-            found |= set(SEP_RE.findall(http.get(BASE + f"fomchistorical{y}.htm").text))
+            page = http.get(BASE + f"fomchistorical{y}.htm").text
+            found |= set(SEP_RE.findall(page))
+            # 历史页不直接链接网页版 SEP：用会议声明日期去试 fomcprojtabl<日期>.htm
+            for d in sorted(set(re.findall(r"monetary(\d{8})a\.htm", page))):
+                if int(d[4:6]) in (1, 3, 4, 6, 9, 11, 12):
+                    candidates.add(d)
             fails = 0
         except Exception as e:
             fails += 1
-            log.info("%d 历史页无网页版 SEP 或读取失败: %s", y, e)
+            log.info("%d 历史页读取失败: %s", y, e)
+    for d in sorted(candidates - found):
+        try:
+            http.get(BASE + f"fomcprojtabl{d}.htm", retries=1)
+            found.add(d)
+        except Exception:
+            pass  # 这次会议没有 SEP，或只有 PDF
     return sorted(found)
 
 

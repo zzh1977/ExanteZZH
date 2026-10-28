@@ -8,11 +8,15 @@ import json
 import logging
 import sys
 
-from . import dashboard, dotplot, dxy, fomc_calendar, fred, implied
+from . import altsources, dashboard, dotplot, dxy, fomc_calendar, fred, implied
 from .config import DATA
 
+def fred_with_fallback():
+    return altsources.fill_missing(fred.update_all())
+
+
 STEPS = {
-    "fred": fred.update_all,
+    "fred": fred_with_fallback,
     "calendar": fomc_calendar.update,
     "dotplot": dotplot.update,
     "dxy": dxy.update,
@@ -42,9 +46,9 @@ def main(argv):
     else:
         print(__doc__)
         return 2
-    # FRED 全部失败视为整体失败，让 Actions 标红
+    # 连政策利率都没拿到视为整体失败，让 Actions 标红
     fr = status.get("fred")
-    if isinstance(fr, dict) and fr and all(v != "ok" for v in fr.values()):
+    if isinstance(fr, dict) and not str(fr.get("EFFR", "")).startswith("ok"):
         return 1
     return 0
 

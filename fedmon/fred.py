@@ -59,7 +59,7 @@ def update_all() -> dict:
     status = {}
     streak = 0  # 连续失败次数：一个站点整体不通时不要每个序列都等超时
     for sid in FRED_SERIES:
-        if streak >= 4:
+        if streak >= (4 if os.environ.get("FRED_API_KEY") else 1):
             status[sid] = "跳过（前面连续失败）"
             continue
         try:
