@@ -8,6 +8,7 @@
 
 - 已完成：两家产品的安全设置对比、各端（网页 / iPad / 桌面）运行位置与文件范围梳理、设置文件优先级、云端结果如何取回、Cowork 本地文件夹规则。
 - 未做：在自己的 Mac 上实际落地配置并逐项测试（见「待办」）。
+- **交接中（2026-10-28）**：仓库 `zzh1977/ExanteZZH` 里混放了几个不相关项目（分支 `claude/ai-security-progress`、`claude/fed-monitor`、`claude/liquidity-step1`、`claude/local-ai-model-setup-a09mzp`，均未合并）。已决定每个项目拆成独立仓库，拆分在另一个会话里进行。本项目内容全部在分支 `claude/ai-security-progress`：`docs/PROGRESS.md`（正本）、`docs/progress.html`（Artifact 源文件）、`CLAUDE.md`（更新规则）。迁到新仓库后，请把本段与「相关链接」里的仓库信息改成新地址。
 - 资料核对日期：2026-10-25。两家产品更新很快，落地前请再核对一次。
 
 ## 已定结论
@@ -154,6 +155,7 @@ managed > 命令行 `--settings` > `.claude/settings.local.json` > `.claude/sett
 
 ## 待办
 
+- [ ] 迁到独立仓库：复制本分支 3 个文件（保留 git 历史更好），新仓库里继续更新同一个 Artifact（发布时传原链接作 `url`，链接不变）
 - [ ] 在 Mac 上按第 2、3 节写入配置；Claude Code 部分放进 managed-settings.json（sudo）
 - [ ] 逐项测试：让 AI 删文件、访问网站、装包、读项目外文件，确认都被拦住
 - [ ] 工作文件夹 `git init` 并开启 Time Machine
@@ -162,6 +164,7 @@ managed > 命令行 `--settings` > `.claude/settings.local.json` > `.claude/sett
 
 ## 更新日志
 
+- **2026-10-28**：准备交接：项目将从共享仓库拆到独立仓库，记录当前文件、分支和迁移步骤。
 - **2026-10-26**：补充结论：两家 deny/allow 优先级相同（更严的赢、更具体的赢），差别只在出厂默认值。
 - **2026-10-25**：补充结论：在本地电脑打开 Artifact 无安全影响。
 - **2026-10-25**：建立本文件，汇总 Codex 与 Claude Code 安全设置对比、各端文件范围、设置文件优先级、Cowork 规则、云端结果取回方式；生成 Artifact 阅读版。

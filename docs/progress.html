@@ -76,7 +76,7 @@ footer{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:
 </header>
 
 <div class="status">
-  <div class="stat"><b>当前阶段</b><span>调研完成 <span class="pill ok">已定</span></span></div>
+  <div class="stat"><b>当前阶段</b><span>调研完成，准备迁到独立仓库 <span class="pill warn">交接中</span></span></div>
   <div class="stat"><b>下一步</b><span>在 Mac 上落地配置并测试 <span class="pill warn">待办</span></span></div>
   <div class="stat"><b>资料核对</b><span>2026-10-25</span></div>
 </div>
@@ -239,6 +239,7 @@ prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="f
 <section>
   <h2><span class="n">08</span>待办</h2>
   <ul class="todo">
+    <li>迁到独立仓库：复制分支 <code>claude/ai-security-progress</code> 的 3 个文件，新仓库里继续更新本页（链接不变）</li>
     <li>在 Mac 上写入第 02 节配置；Claude Code 部分放进 managed-settings.json（sudo）</li>
     <li>逐项测试：让 AI 删文件、访问网站、装包、读项目外文件，确认都被拦住</li>
     <li>工作文件夹 <code>git init</code>，开启 Time Machine</li>
@@ -250,6 +251,8 @@ prefix_rule(pattern=[["pip","pip3","npm","pnpm","yarn"], "install"], decision="f
 <section>
   <h2><span class="n">09</span>更新日志</h2>
   <div class="log">
+    <time datetime="2026-10-28">2026-10-28</time>
+    <p>准备交接：项目将从共享仓库拆到独立仓库。</p>
     <time datetime="2026-10-26">2026-10-26</time>
     <p>补充结论：两家 deny/allow 优先级相同，差别只在出厂默认值。</p>
     <time datetime="2026-10-25">2026-10-25</time>
