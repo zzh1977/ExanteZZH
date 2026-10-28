@@ -375,8 +375,9 @@ def iter_files(root, cfg):
         dirnames[:] = [d for d in dirnames if d.lower() not in cfg["_skip_dirs"]
                        and not d.startswith(".") and d != INDEX_DIR]
         for name in filenames:
-            if (name.lower() in cfg["_skip_files"] or name.startswith("~$")
-                    or name.endswith(".part") or UNDO_LOG.match(name)):
+            # 隐藏文件（如 macOS 的 .DS_Store、外接硬盘上的 ._文件名）、Office 临时文件、未完成的复制
+            if (name.lower() in cfg["_skip_files"] or name.startswith((".", "~$"))
+                    or name == "Icon\r" or name.endswith(".part") or UNDO_LOG.match(name)):
                 continue
             p = Path(dirpath) / name
             if str(p) not in cfg.get("_exclude", ()):

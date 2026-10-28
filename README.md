@@ -14,6 +14,7 @@
   - 依赖装在独立虚拟环境 `venv` 里（`setup_venv.bat` 创建），用 `organize.bat` 运行，系统 Python 保持干净
 - 文档工具：`tools/md_toc.py`（给 md 加固定锚点和目录）、`tools/build_html.py`（md 生成带目录、可跳转的网页，自动核对无遗漏）
 - 离线安装脚本：`scripts/prepare_offline.ps1`（联网电脑）、`scripts/install_offline.ps1`（断网电脑）
+- **Mac 版**：[docs/Mac版操作手册.md](docs/Mac版操作手册.md)，一步安装 `bash scripts/mac/setup_mac.sh`（Apple 芯片；默认英德文 `gemma3:12b`、照片 `qwen3-vl:8b`），运行用 `./organize.sh`
 
 快速使用（在 `file_organizer` 文件夹里）：
 
