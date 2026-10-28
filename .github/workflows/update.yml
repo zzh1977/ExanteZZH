@@ -44,6 +44,7 @@ jobs:
         if: always()
         run: |
           cat data/status.json || true
+          python -m fedmon.summary || true
           python -c "import json;d=json.load(open('data/implied.json'));print('隐含利率来源:',d.get('source'));print('失败:',d.get('errors'));print('会议数:',len(d.get('meetings',[])))" || true
           python -c "import pandas as pd;d=pd.read_csv('data/dotplot.csv');print('点阵图期数:',d.sep_date.nunique(),d.sep_date.min(),'~',d.sep_date.max())" || true
       - name: 上传调试文件（原始页面 + 看板）
