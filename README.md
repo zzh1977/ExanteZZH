@@ -12,6 +12,8 @@
   - 英文/德文文档：`llama3.1:8b`；照片：`qwen3-vl:4b`
   - 复制后校验指纹再删原文件，自动生成归档汇总表，可核对、可撤销
   - 依赖装在独立虚拟环境 `venv` 里（`setup_venv.bat` 创建），用 `organize.bat` 运行，系统 Python 保持干净
+- **工作进度与交接**：[docs/工作进度与交接.md](docs/工作进度与交接.md)（当前状态、未验证事项、待办、维护方法）
+- 测试：`tests/smoke_test.py`（用假 Ollama 服务跑完整流程，不需要真模型）
 - 文档工具：`tools/md_toc.py`（给 md 加固定锚点和目录）、`tools/build_html.py`（md 生成带目录、可跳转的网页，自动核对无遗漏）
 - 离线安装脚本：`scripts/prepare_offline.ps1`（联网电脑）、`scripts/install_offline.ps1`（断网电脑）
 - **Mac 版**：[docs/Mac版操作手册.md](docs/Mac版操作手册.md)，一步安装 `bash scripts/mac/setup_mac.sh`（Apple 芯片；默认英德文 `gemma3:12b`、照片 `qwen3-vl:8b`），运行用 `./organize.sh`
