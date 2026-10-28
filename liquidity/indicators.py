@@ -2,6 +2,7 @@
 
 Sign convention everywhere: positive = looser dollar liquidity.
 """
+import numpy as np
 import pandas as pd
 
 from . import config, transform
@@ -14,7 +15,6 @@ FFILL_LIMIT = {"GDP": 20}  # weeks; everything else bridges at most 2 missing we
 STD_FLOOR = {
     "policy_13w_gdp": 0.1,   # ~ $30bn over 13 weeks
     "sofr_iorb_bp": 1.0,
-    "facility_gdp": 0.05,    # ~ $15bn
 }
 
 
@@ -64,14 +64,18 @@ def build(w: pd.DataFrame) -> pd.DataFrame:
 
     # Stress 2: Fed lending, swap lines and overnight repo (incl. SRF), % of GDP.
     facility = w["WLCFLL"].fillna(0) + w["SWPT"].fillna(0) + w["RPONTSYD"].fillna(0)
-    out["facility_gdp"] = (facility / gdp * 100).rolling(4, min_periods=1).mean()
+    out["facility_gdp"] = facility / gdp * 100
 
     # Scores (sign-adjusted so that positive = looser).
-    out["z_reserves"] = transform.expanding_z(out["reserves_gdp"])
+    regime = out.index >= pd.Timestamp(config.RESERVES_REGIME_START)
+    out["z_reserves"] = transform.expanding_z(out["reserves_gdp"].where(regime))
     out["z_policy"] = transform.rolling_z(out["policy_13w_gdp"], std_floor=STD_FLOOR["policy_13w_gdp"])
     out["z_expected_easing"] = transform.expanding_z(out["expected_easing_bp"])
     out["z_sofr_iorb"] = -transform.rolling_z(out["sofr_iorb_bp"], std_floor=STD_FLOOR["sofr_iorb_bp"])
-    out["z_facility"] = -transform.rolling_z(out["facility_gdp"], std_floor=STD_FLOOR["facility_gdp"])
+    # Log scale so 2008 (~10% of GDP) doesn't dwarf later episodes, and an
+    # expanding window so the 2020 spike doesn't make the 2023 bank-run
+    # lending look normal. 0.1% of GDP is roughly $30bn.
+    out["z_facility"] = -transform.expanding_z(np.log1p(out["facility_gdp"] / 0.1))
 
     out["stock"] = out[["z_reserves", "z_policy"]].mean(axis=1)
     out["expectations"] = out["z_expected_easing"]

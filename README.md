@@ -21,14 +21,18 @@ python -m pytest -q                       # 测试
 
 | 子指数 | 分项 | FRED 序列 | 标准化 |
 | --- | --- | --- | --- |
-| 存量 | 准备金 / 名义GDP | WRESBAL, GDP | 扩展窗口 z |
+| 存量 | 准备金 / 名义GDP | WRESBAL, GDP | 扩展窗口 z，只用2009年以后（之前准备金接近零） |
 | 存量 | 政策性证券净买入（13周）/ GDP，储备管理购买期间剔除短债和MBS变动 | WSHOSHO, WSHOBL, WSHOMCB | 3年滚动 z |
 | 预期 | −(1年期国债 − 有效联邦基金利率)，即已定价的降息幅度 | DGS1, DFF | 扩展窗口 z |
 | 压力 | SOFR − IORB（2021年7月前用 IOER），取反 | SOFR, IORB, IOER | 3年滚动 z |
-| 压力 | 联储贷款 + 央行互换 + 隔夜回购（含SRF）/ GDP，取反 | WLCFLL, SWPT, RPONTSYD | 3年滚动 z |
+| 压力 | 联储贷款 + 央行互换 + 隔夜回购（含SRF）/ GDP，取对数后取反 | WLCFLL, SWPT, RPONTSYD | 扩展窗口 z |
 
 另输出“净流动性”（总资产 − 4周平均TGA − 逆回购）作参考，不计入指数。
 合成指数 = 三个子指数等权平均（至少两个有值），仅供参考，权重待验证后再定。
+
+### 运行方式
+
+本仓库的云会话网络屏蔽了 FRED，因此由 GitHub Actions（`.github/workflows/liquidity.yml`）在推送代码时下载数据、运行计算，并把 `data/raw/` 和 `output/` 提交回分支；也可在 Actions 页面手动运行。
 
 ### 防止前视偏差
 

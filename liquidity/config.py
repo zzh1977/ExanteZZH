@@ -54,6 +54,10 @@ RMP_WINDOWS = [
     ("2025-12-12", None),
 ]
 
+# Reserves were near zero before the Fed began paying interest on them
+# (Oct 2008); scoring today's level against that era would overstate it.
+RESERVES_REGIME_START = "2009-01-01"
+
 WEEK = "W-FRI"  # every weekly row holds what was public by Friday
 Z_EXPANDING_MIN = 156  # weeks (3 years) before an expanding z-score starts
 Z_ROLLING_WINDOW = 156
